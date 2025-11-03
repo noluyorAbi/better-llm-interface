@@ -35,7 +35,6 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "Alperen Adatepe",
-      email: "adatepe.alperen@campus.lmu.de",
     },
   ],
   creator: "Alperen Adatepe",

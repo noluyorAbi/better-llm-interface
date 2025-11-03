@@ -23,7 +23,7 @@ Next.js 16 • TypeScript • Tailwind CSS 4 • shadcn/ui • Supabase • Fram
 
 ### Prerequisites
 
-- Node.js 20.x+
+- [Bun](https://bun.sh) (recommended) or Node.js 20.x+
 - Supabase account ([Sign up](https://supabase.com))
 
 ### Installation
@@ -31,7 +31,7 @@ Next.js 16 • TypeScript • Tailwind CSS 4 • shadcn/ui • Supabase • Fram
 ```bash
 git clone https://github.com/noluyorAbi/better-llm-interface.git
 cd better-llm-interface
-npm install
+bun install
 ```
 
 ### Environment Variables
@@ -49,18 +49,18 @@ Get these values from [Supabase Dashboard](https://supabase.com/dashboard) → S
 ### Run Development Server
 
 ```bash
-npm run dev
+bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
 ## 📜 Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run lft` - Format, lint, type check
+- `bun dev` - Start development server
+- `bun run build` - Build for production
+- `bun start` - Start production server
+- `bun run lint` - Run ESLint
+- `bun run lft` - Format, lint, type check
 
 ## 📚 Documentation
 
