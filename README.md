@@ -1,5 +1,10 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Documentation
+
+- [SMTP Setup](./docs/SMTP_SETUP.md) - Configure custom SMTP for Supabase Auth emails
+- [Account Deletion Setup](./docs/ACCOUNT_DELETION_SETUP.md) - Setup Supabase Service Role Key for account deletion
+
 ## Getting Started
 
 First, run the development server:

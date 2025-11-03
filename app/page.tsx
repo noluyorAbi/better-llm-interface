@@ -1,65 +1,330 @@
-import Image from "next/image";
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/components/auth-provider";
+import {
+  MessageSquare,
+  History,
+  Image,
+  Sparkles,
+  FolderOpen,
+  Zap,
+  LogOut,
+  Settings,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.25, 0.46, 0.45, 0.94] as const,
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.25, 0.46, 0.45, 0.94] as const,
+    },
+  },
+};
 
 export default function Home() {
+  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/login");
+  };
+
+  const features = [
+    {
+      icon: MessageSquare,
+      title: "Core Chat Window",
+      description: "Intuitive text input and response area for seamless LLM interactions",
+    },
+    {
+      icon: History,
+      title: "Prompt History Panel",
+      description: "Quickly access and reuse previous prompts with a single click",
+    },
+    {
+      icon: Image,
+      title: "Media Tab",
+      description: "View all images, videos, and files attached in your conversations",
+    },
+    {
+      icon: Sparkles,
+      title: "Smart Widget Suggestions",
+      description: "Context-aware action suggestions like calendar events, maps, and notes",
+    },
+    {
+      icon: FolderOpen,
+      title: "Drag & Drop Canvas",
+      description: "Organize conversation snippets by dragging them into folders or canvases",
+    },
+    {
+      icon: Zap,
+      title: "Personalized Experience",
+      description: "Most-used widgets automatically appear at the top of the suggestion bar",
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <motion.header
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      >
+        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center gap-2"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <span className="text-lg font-semibold">LLM Interface</span>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center gap-3"
           >
-            Documentation
-          </a>
+            {!loading && (
+              <>
+                {user ? (
+                  <>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">
+                      {user.email}
+                    </span>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/settings" className="gap-2">
+                        <Settings className="h-4 w-4" />
+                        <span className="hidden sm:inline">Settings</span>
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+                      <LogOut className="h-4 w-4" />
+                      <span className="hidden sm:inline">Sign Out</span>
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/login">Sign In</Link>
+                    </Button>
+                    <Button size="sm" asChild>
+                      <Link href="/signup">Sign Up</Link>
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+            <ThemeToggle />
+          </motion.div>
         </div>
-      </main>
+      </motion.header>
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden border-b">
+        <div className="container mx-auto px-4 py-24 sm:px-6 lg:px-8">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="mx-auto max-w-3xl text-center"
+          >
+            <motion.div variants={itemVariants}>
+              <Badge variant="secondary" className="mb-4">
+                Bachelor Thesis MVP
+              </Badge>
+            </motion.div>
+            <motion.h1
+              variants={itemVariants}
+              className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
+            >
+              Intelligent LLM
+              <span className="block text-primary">Interface</span>
+            </motion.h1>
+            <motion.p
+              variants={itemVariants}
+              className="mb-8 text-lg text-muted-foreground sm:text-xl"
+            >
+              A modern interface that enhances workflow speed and satisfaction through smart panels,
+              widget suggestions, and intuitive organization tools.
+            </motion.p>
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-col gap-4 sm:flex-row sm:justify-center"
+            >
+              <Button size="lg" className="text-base">
+                Get Started
+              </Button>
+              <Button size="lg" variant="outline" className="text-base">
+                Learn More
+              </Button>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.6 }}
+            className="mx-auto max-w-2xl text-center mb-16"
+          >
+            <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Core Features</h2>
+            <p className="text-lg text-muted-foreground">
+              Everything you need for an enhanced LLM interaction experience
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-50px" }}
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={index}
+                  variants={cardVariants}
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                >
+                  <Card className="transition-all hover:shadow-md h-full">
+                    <CardHeader>
+                      <motion.div
+                        whileHover={{ scale: 1.1, rotate: 5 }}
+                        transition={{ duration: 0.2 }}
+                        className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"
+                      >
+                        <Icon className="h-6 w-6 text-primary" />
+                      </motion.div>
+                      <CardTitle>{feature.title}</CardTitle>
+                      <CardDescription>{feature.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="border-t bg-muted/50 py-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.6 }}
+            className="mx-auto max-w-2xl text-center"
+          >
+            <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              Ready to Experience the Future?
+            </h2>
+            <p className="mb-8 text-lg text-muted-foreground">
+              Built with modern web technologies and designed for optimal user experience. Connect
+              to any LLM API and start organizing your conversations.
+            </p>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button size="lg" className="text-base">
+                Launch Prototype
+              </Button>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="border-t bg-muted/30 py-16"
+      >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            {/* Project Info */}
+            <div className="text-center md:text-left">
+              <h3 className="font-semibold text-foreground mb-2">LLM Interface</h3>
+              <p className="text-sm text-muted-foreground">Bachelor Thesis MVP</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Built with Next.js, shadcn/ui, and Tailwind CSS
+              </p>
+            </div>
+
+            {/* Contact Info */}
+            <div className="text-center">
+              <h3 className="font-semibold text-foreground mb-2">Contact</h3>
+              <p className="text-sm font-medium text-foreground mb-1">alperen adatepe</p>
+              <p className="text-sm">
+                <a
+                  href="mailto:adatepe.alperen@campus.lmu.de"
+                  className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 hover:underline-offset-2"
+                >
+                  adatepe.alperen@campus.lmu.de
+                </a>
+              </p>
+            </div>
+
+            {/* Additional Info */}
+            <div className="text-center md:text-right">
+              <h3 className="font-semibold text-foreground mb-2">About</h3>
+              <p className="text-sm text-muted-foreground">
+                A modern intelligent LLM interface with smart panels and intuitive organization
+                tools.
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="pt-8 border-t border-border/50">
+            <p className="text-center text-xs text-muted-foreground">
+              © {new Date().getFullYear()} LLM Interface. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </motion.footer>
     </div>
   );
 }
