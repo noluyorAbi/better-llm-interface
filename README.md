@@ -1,41 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Intelligent LLM Interface
 
-## Documentation
+A modern, intelligent interface for Large Language Model interactions designed to enhance productivity and user satisfaction. Built as a Bachelor Thesis project at Ludwig Maximilian University of Munich (LMU).
 
-- [SMTP Setup](./docs/SMTP_SETUP.md) - Configure custom SMTP for Supabase Auth emails
-- [Account Deletion Setup](./docs/ACCOUNT_DELETION_SETUP.md) - Setup Supabase Service Role Key for account deletion
+**Repository**: [https://github.com/noluyorAbi/better-llm-interface](https://github.com/noluyorAbi/better-llm-interface)
 
-## Getting Started
+## ✨ Features
 
-First, run the development server:
+- Core chat window for seamless LLM interactions
+- Prompt history panel for quick access to previous prompts
+- Media tab for viewing attached files
+- Smart widget suggestions with context-aware actions
+- Drag & drop canvas for organizing conversations
+- Personalized experience with adaptive widget ordering
+- Authentication with Supabase Auth
+- Light/dark theme support
+
+## 🛠️ Tech Stack
+
+Next.js 16 • TypeScript • Tailwind CSS 4 • shadcn/ui • Supabase • Framer Motion • React Hook Form + Zod
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20.x+
+- Supabase account ([Sign up](https://supabase.com))
+
+### Installation
+
+```bash
+git clone https://github.com/noluyorAbi/better-llm-interface.git
+cd better-llm-interface
+npm install
+```
+
+### Environment Variables
+
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key  # Optional
+```
+
+Get these values from [Supabase Dashboard](https://supabase.com/dashboard) → Settings → API
+
+### Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📜 Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run lft` - Format, lint, type check
 
-## Learn More
+## 📚 Documentation
 
-To learn more about Next.js, take a look at the following resources:
+- [SMTP Configuration](./docs/SMTP_CONFIGURATION.md) - Configure custom SMTP for Supabase Auth emails
+- [Account Deletion](./docs/ACCOUNT_DELETION.md) - Setup Supabase Service Role Key for account deletion
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚢 Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deploy on [Vercel](https://vercel.com) or any Node.js platform. Remember to set environment variables in your hosting dashboard.
 
-## Deploy on Vercel
+## 🔒 Security
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Never commit `.env.local` or secrets
+- Service Role Key only in server-side code
+- Use environment variables for sensitive data
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 👤 Author
+
+**Alperen Adatepe** - [adatepe.alperen@campus.lmu.de](mailto:adatepe.alperen@campus.lmu.de)  
+Ludwig Maximilian University of Munich (LMU)
+
+---
+
+Built with ❤️ for LMU Bachelor Thesis
