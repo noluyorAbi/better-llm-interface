@@ -8,8 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Mail, Mailbox } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,6 +27,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
   const supabase = createClient();
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -44,12 +54,24 @@ export default function SignupPage() {
 
       if (error) throw error;
 
-      router.push("/login?message=Check your email to confirm your account");
+      setShowConfirmationDialog(true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred";
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEmailClient = (client: string) => {
+    const emailClients: Record<string, string> = {
+      gmail: "https://mail.google.com/mail/u/0/#inbox",
+      outlook: "https://outlook.live.com/mail/0/",
+    };
+
+    const url = emailClients[client];
+    if (url) {
+      window.open(url, "_blank");
     }
   };
 
@@ -130,6 +152,64 @@ export default function SignupPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="rounded-full bg-primary/10 p-3">
+                <Mailbox className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Check your email</DialogTitle>
+            <DialogDescription className="text-center">
+              We&apos;ve sent a confirmation email to
+              <br />
+              <span className="font-semibold text-foreground">{email}</span>
+              <br />
+              <br />
+              Please click on the confirmation link in the email to activate your account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-center text-muted-foreground">
+              Click the button below to open your email client:
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => openEmailClient("gmail")}
+                className="flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Gmail
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => openEmailClient("outlook")}
+                className="flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Outlook
+              </Button>
+            </div>
+            <p className="text-sm text-center text-muted-foreground pt-2">
+              or check your mails manually
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                setShowConfirmationDialog(false);
+                router.push("/login");
+              }}
+              className="w-full"
+            >
+              Continue to Login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
