@@ -672,7 +672,7 @@ export default function ChatPage() {
                   ))}
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -687,6 +687,7 @@ export default function ChatPage() {
                   size="icon"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading || loadingMessages}
+                  className="shrink-0 h-[44px] w-[44px]"
                 >
                   <Paperclip className="h-4 w-4" />
                 </Button>
@@ -722,6 +723,7 @@ export default function ChatPage() {
                     isLoading || loadingMessages || (!input.trim() && attachedFiles.length === 0)
                   }
                   size="icon"
+                  className="shrink-0 h-[44px] w-[44px]"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -20,7 +20,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="outline" size="icon" className="relative">
+      <Button variant="outline" size="icon" className="relative flex items-center justify-center">
         <Sun className="h-[1.2rem] w-[1.2rem]" />
         <span className="sr-only">Toggle theme</span>
       </Button>
@@ -32,14 +32,14 @@ export function ThemeToggle() {
       variant="outline"
       size="icon"
       onClick={toggleTheme}
-      className="relative overflow-hidden"
+      className="relative overflow-hidden flex items-center justify-center"
       style={{
         transition: "all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
       }}
     >
       <div className="relative h-[1.2rem] w-[1.2rem]">
         <Sun
-          className={`absolute inset-0 h-[1.2rem] w-[1.2rem] ${
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[1.2rem] w-[1.2rem] ${
             theme === "dark" ? "rotate-90 scale-0 opacity-0" : "rotate-0 scale-100 opacity-100"
           }`}
           style={{
@@ -47,7 +47,7 @@ export function ThemeToggle() {
           }}
         />
         <Moon
-          className={`absolute inset-0 h-[1.2rem] w-[1.2rem] ${
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[1.2rem] w-[1.2rem] ${
             theme === "dark" ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-0 opacity-0"
           }`}
           style={{

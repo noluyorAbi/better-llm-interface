@@ -195,11 +195,7 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
             Conversations
           </h2>
         </div>
-        <Button
-          onClick={onNewChat}
-          className="w-full h-11 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 shadow-sm font-medium transition-all duration-200"
-          size="default"
-        >
+        <Button onClick={onNewChat} className="w-full h-11 shadow-sm font-medium" size="default">
           <Plus className="h-4 w-4 mr-2" />
           New Chat
         </Button>
