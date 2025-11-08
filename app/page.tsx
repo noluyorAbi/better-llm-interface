@@ -3,21 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/components/auth-provider";
-import {
-  MessageSquare,
-  History,
-  Image,
-  Sparkles,
-  FolderOpen,
-  Zap,
-  LogOut,
-  Settings,
-} from "lucide-react";
+import { Navbar } from "@/components/navbar";
+import { MessageSquare, History, Image, Sparkles, FolderOpen, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,14 +43,6 @@ const cardVariants = {
 };
 
 export default function Home() {
-  const { user, loading, signOut } = useAuth();
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/login");
-  };
-
   const features = [
     {
       icon: MessageSquare,
@@ -97,62 +78,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <motion.header
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-      >
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex items-center gap-2"
-          >
-            <span className="text-lg font-semibold">LLM Interface</span>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex items-center gap-3"
-          >
-            {!loading && (
-              <>
-                {user ? (
-                  <>
-                    <span className="text-sm text-muted-foreground hidden sm:inline">
-                      {user.email}
-                    </span>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href="/settings" className="gap-2">
-                        <Settings className="h-4 w-4" />
-                        <span className="hidden sm:inline">Settings</span>
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">Sign Out</span>
-                    </Button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href="/login">Sign In</Link>
-                    </Button>
-                    <Button size="sm" asChild>
-                      <Link href="/signup">Sign Up</Link>
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            <ThemeToggle />
-          </motion.div>
-        </div>
-      </motion.header>
+      <Navbar title="LLM Interface" variant="home" />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b">
@@ -186,8 +112,8 @@ export default function Home() {
               variants={itemVariants}
               className="flex flex-col gap-4 sm:flex-row sm:justify-center"
             >
-              <Button size="lg" className="text-base">
-                Get Started
+              <Button size="lg" className="text-base" asChild>
+                <Link href="/chat">Start Chatting</Link>
               </Button>
               <Button size="lg" variant="outline" className="text-base">
                 Learn More
@@ -266,8 +192,8 @@ export default function Home() {
               to any LLM API and start organizing your conversations.
             </p>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button size="lg" className="text-base">
-                Launch Prototype
+              <Button size="lg" className="text-base" asChild>
+                <Link href="/chat">Launch Chat Interface</Link>
               </Button>
             </motion.div>
           </motion.div>
