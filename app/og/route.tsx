@@ -19,16 +19,17 @@ export async function GET(request: NextRequest) {
             width: "100%",
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
-            backgroundColor: "#000000",
-            backgroundImage:
-              "radial-gradient(circle at 20% 30%, rgba(26, 26, 26, 0.8) 0%, transparent 60%), radial-gradient(circle at 80% 70%, rgba(10, 10, 10, 0.6) 0%, transparent 60%), linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 100%)",
-            fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            background: "linear-gradient(135deg, #020817 0%, #020814 40%, #020817 100%)",
+            fontFamily:
+              "-apple-system, system-ui, -system-ui, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
             position: "relative",
             overflow: "hidden",
+            padding: "0",
           }}
         >
+          {/* Radial overlays */}
           <div
             style={{
               position: "absolute",
@@ -36,89 +37,219 @@ export async function GET(request: NextRequest) {
               left: 0,
               right: 0,
               bottom: 0,
-              opacity: 0.03,
-              backgroundImage:
-                "linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
+              background: "radial-gradient(circle at 0% 0%, #111827 0%, transparent 70%)",
+              opacity: 0.9,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "radial-gradient(circle at 100% 40%, #111827 0%, transparent 70%)",
+              opacity: 0.9,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background:
+                "radial-gradient(circle at 0% 60%, rgba(37, 99, 235, 0.22) 0%, transparent 60%)",
+              opacity: 0.7,
             }}
           />
 
+          {/* Blurred abstract shapes */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "340px",
+              height: "260px",
+              background: "#111827",
+              opacity: 0.32,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: "110px",
+              left: "180px",
+              width: "320px",
+              height: "320px",
+              borderRadius: "50%",
+              background: "#020817",
+              opacity: 0.32,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: "110px",
+              right: "160px",
+              width: "280px",
+              height: "280px",
+              borderRadius: "50%",
+              background: "#020817",
+              opacity: 0.32,
+            }}
+          />
+
+          {/* Fine grid lines */}
+          <div
+            style={{
+              position: "absolute",
+              top: "140px",
+              left: "260px",
+              width: "1px",
+              height: "460px",
+              background: "#1F2937",
+              opacity: 0.15,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "140px",
+              left: "380px",
+              width: "1px",
+              height: "460px",
+              background: "#1F2937",
+              opacity: 0.15,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "140px",
+              left: "500px",
+              width: "1px",
+              height: "460px",
+              background: "#1F2937",
+              opacity: 0.15,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "80px",
+              left: "760px",
+              width: "360px",
+              height: "1px",
+              background: "#111827",
+              opacity: 0.15,
+              transform: "rotate(-45deg)",
+              transformOrigin: "0 0",
+            }}
+          />
+
+          {/* Accent vertical line left */}
+          <div
+            style={{
+              position: "absolute",
+              top: "150px",
+              left: "120px",
+              width: "4px",
+              height: "170px",
+              background: "linear-gradient(180deg, #2563EB 0%, #22C55E 100%)",
+            }}
+          />
+
+          {/* Main content */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              alignItems: "flex-start",
-              justifyContent: "center",
-              width: "90%",
-              maxWidth: "1000px",
-              padding: "80px",
               position: "relative",
               zIndex: 1,
+              paddingLeft: "150px",
+              paddingTop: "150px",
             }}
           >
+            {/* Title */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                marginBottom: "32px",
+                flexDirection: "column",
+                marginBottom: "20px",
               }}
             >
               <div
                 style={{
-                  width: "5px",
-                  height: "56px",
-                  backgroundColor: "#ffffff",
-                  marginRight: "20px",
-                  borderRadius: "2px",
-                }}
-              />
-              <div
-                style={{
-                  fontSize: "76px",
-                  fontWeight: "800",
-                  color: "#ffffff",
-                  letterSpacing: "-0.03em",
-                  lineHeight: "1.05",
+                  fontSize: "64px",
+                  fontWeight: "600",
+                  color: "#F9FAFB",
+                  letterSpacing: "6px",
+                  lineHeight: "1.1",
+                  marginBottom: "5px",
                 }}
               >
-                {title}
+                INTELLIGENT
               </div>
+              <div
+                style={{
+                  fontSize: "64px",
+                  fontWeight: "600",
+                  color: "#F9FAFB",
+                  letterSpacing: "6px",
+                  lineHeight: "1.1",
+                }}
+              >
+                LLM INTERFACE
+              </div>
+
+              {/* Underline */}
+              <div
+                style={{
+                  width: "260px",
+                  height: "2px",
+                  background: "#4B5563",
+                  opacity: 0.8,
+                  marginTop: "15px",
+                }}
+              />
             </div>
 
+            {/* Subtitle */}
             <div
               style={{
-                fontSize: "30px",
-                color: "#b0b0b0",
+                fontSize: "22px",
                 fontWeight: "400",
+                color: "#9CA3AF",
                 lineHeight: "1.6",
-                maxWidth: "920px",
-                marginLeft: "25px",
-                marginBottom: "48px",
+                marginTop: "25px",
+                marginBottom: "35px",
               }}
             >
               {description}
             </div>
 
+            {/* Badges row */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                marginLeft: "25px",
+                gap: "20px",
                 flexWrap: "wrap",
               }}
             >
+              {/* Badge 1 - LMU Bachelor Thesis */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  padding: "8px 16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  fontSize: "16px",
-                  color: "#888888",
-                  fontWeight: "500",
+                  padding: "0 24px",
+                  height: "40px",
+                  background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                  borderRadius: "18px",
+                  border: "1px solid #111827",
                 }}
               >
                 <div
@@ -126,23 +257,31 @@ export async function GET(request: NextRequest) {
                     width: "8px",
                     height: "8px",
                     borderRadius: "50%",
-                    backgroundColor: "#666666",
-                    marginRight: "10px",
+                    backgroundColor: "#22C55E",
+                    marginRight: "12px",
                   }}
                 />
-                LMU Bachelor Thesis
+                <span
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "400",
+                    color: "#E5E7EB",
+                  }}
+                >
+                  LMU Bachelor Thesis
+                </span>
               </div>
+
+              {/* Badge 2 - Alperen Adatepe */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  padding: "8px 16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  fontSize: "16px",
-                  color: "#888888",
-                  fontWeight: "500",
+                  padding: "0 24px",
+                  height: "40px",
+                  background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                  borderRadius: "18px",
+                  border: "1px solid #111827",
                 }}
               >
                 <div
@@ -150,23 +289,31 @@ export async function GET(request: NextRequest) {
                     width: "8px",
                     height: "8px",
                     borderRadius: "50%",
-                    backgroundColor: "#666666",
-                    marginRight: "10px",
+                    backgroundColor: "#38BDF8",
+                    marginRight: "12px",
                   }}
                 />
-                Alperen Adatepe
+                <span
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "400",
+                    color: "#E5E7EB",
+                  }}
+                >
+                  Alperen Adatepe
+                </span>
               </div>
+
+              {/* Badge 3 - Tech stack */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  padding: "8px 16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  fontSize: "16px",
-                  color: "#888888",
-                  fontWeight: "500",
+                  padding: "0 24px",
+                  height: "40px",
+                  background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                  borderRadius: "18px",
+                  border: "1px solid #111827",
                 }}
               >
                 <div
@@ -174,48 +321,96 @@ export async function GET(request: NextRequest) {
                     width: "8px",
                     height: "8px",
                     borderRadius: "50%",
-                    backgroundColor: "#666666",
-                    marginRight: "10px",
+                    backgroundColor: "#F97316",
+                    marginRight: "12px",
                   }}
                 />
-                Next.js • TypeScript • Supabase
+                <span
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "400",
+                    color: "#E5E7EB",
+                  }}
+                >
+                  Next.js • TypeScript • Supabase
+                </span>
               </div>
             </div>
           </div>
 
+          {/* Minimal futuristic accents - lines */}
           <div
             style={{
               position: "absolute",
-              bottom: "60px",
-              right: "80px",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              fontSize: "18px",
-              color: "#505050",
-              fontWeight: "500",
-              letterSpacing: "0.02em",
+              top: "420px",
+              left: "160px",
+              width: "100px",
+              height: "40px",
+              borderLeft: "1px solid #4B5563",
+              borderBottom: "1px solid #4B5563",
+              opacity: 0.24,
             }}
-          >
-            <div
-              style={{
-                width: "2px",
-                height: "18px",
-                backgroundColor: "#404040",
-                borderRadius: "1px",
-              }}
-            />
-            <span style={{ color: "#606060" }}>bt.adatepe.dev</span>
-          </div>
-
+          />
           <div
             style={{
               position: "absolute",
-              top: "60px",
-              left: "80px",
-              width: "120px",
-              height: "2px",
-              background: "linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%)",
+              top: "180px",
+              right: "220px",
+              width: "140px",
+              height: "40px",
+              borderRight: "1px solid #4B5563",
+              borderTop: "1px solid #4B5563",
+              opacity: 0.24,
+            }}
+          />
+
+          {/* Minimal futuristic accents - dots */}
+          <div
+            style={{
+              position: "absolute",
+              top: "130px",
+              left: "220px",
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: "#6B7280",
+              opacity: 0.25,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "110px",
+              left: "340px",
+              width: "5px",
+              height: "5px",
+              borderRadius: "50%",
+              background: "#6B7280",
+              opacity: 0.25,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "260px",
+              right: "300px",
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: "#6B7280",
+              opacity: 0.25,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "200px",
+              right: "160px",
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              background: "#6B7280",
+              opacity: 0.25,
             }}
           />
         </div>

@@ -1,0 +1,148 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title>Intelligent LLM Interface – Open Graph Image</title>
+  <desc>Modern dark OG image for the Intelligent LLM Interface with subtle gradients, geometric accents and tech badges.</desc>
+
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020817"/>
+      <stop offset="40%" stop-color="#020814"/>
+      <stop offset="100%" stop-color="#020817"/>
+    </linearGradient>
+
+    <!-- Soft radial highlights -->
+    <radialGradient id="radial-top" cx="0%" cy="0%" r="70%">
+      <stop offset="0%" stop-color="#111827" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#020817" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#020817" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="radial-right" cx="100%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#111827" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#020817" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#020817" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Blue accent glow -->
+    <radialGradient id="accent-blue" cx="0%" cy="60%" r="60%">
+      <stop offset="0%" stop-color="#2563EB" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#020817" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#020817" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Blur for background shapes -->
+    <filter id="soft-blur">
+      <feGaussianBlur stdDeviation="90" />
+    </filter>
+
+    <!-- Badge gradient -->
+    <linearGradient id="badge-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020817" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#111827" stop-opacity="0.98"/>
+    </linearGradient>
+
+    <!-- Accent line gradient -->
+    <linearGradient id="accent-line" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="1200" height="630" fill="url(#bg-gradient)" />
+
+  <!-- Overlays -->
+  <rect width="1200" height="630" fill="url(#radial-top)" opacity="0.9" />
+  <rect width="1200" height="630" fill="url(#radial-right)" opacity="0.9" />
+  <rect width="1200" height="630" fill="url(#accent-blue)" opacity="0.7" />
+
+  <!-- Blurred abstract shapes (Vercel-esque, minimal) -->
+  <g filter="url(#soft-blur)" opacity="0.32">
+    <polygon points="860,0 1200,0 1200,260" fill="#111827"/>
+    <circle cx="180" cy="520" r="160" fill="#020817"/>
+    <circle cx="1040" cy="520" r="140" fill="#020817"/>
+  </g>
+
+  <!-- Fine grid dots (subtle noise) -->
+  <g opacity="0.15">
+    <!-- vertical lines -->
+    <line x1="260" y1="140" x2="260" y2="600" stroke="#1F2937" stroke-width="0.5"/>
+    <line x1="380" y1="140" x2="380" y2="600" stroke="#1F2937" stroke-width="0.5"/>
+    <line x1="500" y1="140" x2="500" y2="600" stroke="#1F2937" stroke-width="0.5"/>
+    <!-- diagonal accent -->
+    <line x1="760" y1="80" x2="1120" y2="360" stroke="#111827" stroke-width="1"/>
+  </g>
+
+  <!-- Accent vertical line left -->
+  <line x1="120" y1="150" x2="120" y2="320" stroke="url(#accent-line)" stroke-width="4" />
+
+  <!-- Title -->
+  <g fill="#F9FAFB" font-family="-apple-system, system-ui, -system-ui, BlinkMacSystemFont, 'SF Pro Text', -sans-serif">
+    <text x="150" y="190"
+          font-size="64"
+          font-weight="600"
+          letter-spacing="6">
+      INTELLIGENT
+    </text>
+    <text x="150" y="255"
+          font-size="64"
+          font-weight="600"
+          letter-spacing="6">
+      LLM INTERFACE
+    </text>
+
+    <!-- Underline -->
+    <rect x="150" y="270" width="260" height="2" fill="#4B5563" opacity="0.8"/>
+
+    <!-- Subtitle -->
+    <text x="150" y="315"
+          font-size="22"
+          font-weight="400"
+          fill="#9CA3AF">
+      A modern, intelligent interface for Large Language Model interactions
+    </text>
+  </g>
+
+  <!-- Badges row -->
+  <g font-family="-apple-system, system-ui, BlinkMacSystemFont, 'SF Pro Text', sans-serif"
+     font-size="16"
+     fill="#E5E7EB">
+
+    <!-- Badge 1 -->
+    <g transform="translate(150,350)">
+      <rect x="0" y="0" rx="18" ry="18" width="220" height="40"
+            fill="url(#badge-gradient)" stroke="#111827" stroke-width="1"/>
+      <circle cx="24" cy="20" r="4" fill="#22C55E"/>
+      <text x="40" y="24" font-weight="400">LMU Bachelor Thesis</text>
+    </g>
+
+    <!-- Badge 2 -->
+    <g transform="translate(390,350)">
+      <rect x="0" y="0" rx="18" ry="18" width="210" height="40"
+            fill="url(#badge-gradient)" stroke="#111827" stroke-width="1"/>
+      <circle cx="24" cy="20" r="4" fill="#38BDF8"/>
+      <text x="40" y="24" font-weight="400">Alperen Adatepe</text>
+    </g>
+
+    <!-- Badge 3 -->
+    <g transform="translate(620,350)">
+      <rect x="0" y="0" rx="18" ry="18" width="310" height="40"
+            fill="url(#badge-gradient)" stroke="#111827" stroke-width="1"/>
+      <circle cx="24" cy="20" r="4" fill="#F97316"/>
+      <text x="40" y="24" font-weight="400">Next.js • TypeScript • Supabase</text>
+    </g>
+  </g>
+
+  <!-- Minimal futuristic accents -->
+  <g opacity="0.24" stroke="#4B5563" stroke-width="1">
+    <line x1="160" y1="420" x2="260" y2="460"/>
+    <line x1="980" y1="180" x2="1120" y2="140"/>
+  </g>
+
+  <g opacity="0.25" fill="#6B7280">
+    <circle cx="220" cy="130" r="3"/>
+    <circle cx="340" cy="110" r="2.5"/>
+    <circle cx="900" cy="260" r="3"/>
+    <circle cx="1040" cy="200" r="2"/>
+  </g>
+</svg>
