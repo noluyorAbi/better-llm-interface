@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { messages, chatId } = await request.json();
+    const { messages, chatId, isEdit } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages array is required" }, { status: 400 });
@@ -282,44 +282,89 @@ export async function POST(request: Request) {
             .eq("id", currentChatId)
             .single();
 
-          const existingMessages = Array.isArray(currentChat?.messages)
-            ? (
-                currentChat.messages as Array<{
-                  id?: string;
+          // If this is an edit operation, truncate existing messages to match incoming messages
+          // The incoming messages array already contains only the messages up to and including the edited one
+          let existingMessages: Array<{
+            id: string;
+            role: string;
+            content: string;
+            images?: Array<{ url: string; prompt?: string }> | null;
+            files?: FileAttachment[] | null;
+            created_at: string;
+            message_number: number;
+            edited?: boolean;
+            edited_at?: string;
+          }> = [];
+
+          if (isEdit) {
+            // For edits, use the incoming messages (already truncated) as the base
+            // Exclude the last message (the edited one) - we'll add it back with the edited flag
+            existingMessages = messages.slice(0, -1).map(
+              (
+                msg: {
                   role: string;
                   content: string;
-                  images?: Array<{ url: string; prompt?: string }> | null;
-                  files?: FileAttachment[] | null;
-                  created_at?: string;
-                  message_number?: number;
-                }>
-              ).map((msg, index) => ({
-                id: msg.id || randomUUID(),
-                role: msg.role,
-                content: msg.content,
-                images: msg.images || null,
-                files: msg.files || null,
-                created_at: msg.created_at || new Date().toISOString(),
-                message_number: msg.message_number || index + 1,
-              }))
-            : [];
+                  files?: FileAttachment[];
+                  edited?: boolean;
+                  edited_at?: string;
+                },
+                index: number
+              ) => {
+                // Try to preserve existing message IDs and metadata from database
+                const dbMessage = Array.isArray(currentChat?.messages)
+                  ? (
+                      currentChat.messages as Array<{
+                        id?: string;
+                        role: string;
+                        content: string;
+                        created_at?: string;
+                        message_number?: number;
+                        edited?: boolean;
+                        edited_at?: string;
+                      }>
+                    ).find((m) => m.content === msg.content && m.role === msg.role)
+                  : null;
 
-          // Generate AI title if this is the first message in an existing chat
-          if (existingMessages.length === 0 && lastUserMessage && lastUserMessage.role === "user") {
-            const firstMessageContent = lastUserMessage.content || "";
-            if (firstMessageContent.trim().length > 0) {
-              generateChatTitle(firstMessageContent)
-                .then(async (aiTitle) => {
-                  try {
-                    await supabase.from("chats").update({ title: aiTitle }).eq("id", currentChatId);
-                  } catch (error) {
-                    console.error("Error updating chat title:", error);
-                  }
-                })
-                .catch((error: unknown) => {
-                  console.error("Error generating chat title:", error);
-                });
-            }
+                return {
+                  id: dbMessage?.id || randomUUID(),
+                  role: msg.role,
+                  content: msg.content,
+                  images: null,
+                  files: msg.files || null,
+                  created_at: dbMessage?.created_at || new Date().toISOString(),
+                  message_number: dbMessage?.message_number || index + 1,
+                  edited: dbMessage?.edited || false,
+                  edited_at: dbMessage?.edited_at || undefined,
+                };
+              }
+            );
+          } else {
+            // For normal messages, load from database
+            existingMessages = Array.isArray(currentChat?.messages)
+              ? (
+                  currentChat.messages as Array<{
+                    id?: string;
+                    role: string;
+                    content: string;
+                    images?: Array<{ url: string; prompt?: string }> | null;
+                    files?: FileAttachment[] | null;
+                    created_at?: string;
+                    message_number?: number;
+                    edited?: boolean;
+                    edited_at?: string;
+                  }>
+                ).map((msg, index) => ({
+                  id: msg.id || randomUUID(),
+                  role: msg.role,
+                  content: msg.content,
+                  images: msg.images || null,
+                  files: msg.files || null,
+                  created_at: msg.created_at || new Date().toISOString(),
+                  message_number: msg.message_number || index + 1,
+                  edited: msg.edited || false,
+                  edited_at: msg.edited_at || undefined,
+                }))
+              : [];
           }
 
           const nextMessageNumber =
@@ -327,33 +372,73 @@ export async function POST(request: Request) {
               ? Math.max(...existingMessages.map((msg) => msg.message_number || 0), 0) + 1
               : 1;
 
-          const newMessages = [
-            ...(lastUserMessage && lastUserMessage.role === "user"
-              ? [
-                  {
-                    id: randomUUID(),
-                    role: "user",
-                    content: lastUserMessage.content,
-                    files: lastUserMessage.files || null,
-                    created_at: new Date().toISOString(),
-                    message_number: nextMessageNumber,
-                  },
-                ]
-              : []),
-            {
-              id: randomUUID(),
-              role: "assistant",
-              content: outputText,
-              images: images.length > 0 ? images : null,
-              created_at: new Date().toISOString(),
-              message_number:
-                lastUserMessage && lastUserMessage.role === "user"
-                  ? nextMessageNumber + 1
-                  : nextMessageNumber,
-            },
-          ];
+          // For edit operations, the last message in the incoming array is the edited user message
+          // We need to add it to existingMessages with the edited flag preserved
+          let messagesToSave: Array<{
+            id: string;
+            role: string;
+            content: string;
+            images?: Array<{ url: string; prompt?: string }> | null;
+            files?: FileAttachment[] | null;
+            created_at: string;
+            message_number: number;
+            edited?: boolean;
+            edited_at?: string;
+          }> = [];
 
-          const updatedMessages = [...existingMessages, ...newMessages];
+          if (isEdit && lastUserMessage && lastUserMessage.role === "user") {
+            // Find the edited message from incoming messages
+            const editedUserMessage = messages[messages.length - 1];
+            messagesToSave = [
+              ...existingMessages,
+              {
+                id: randomUUID(),
+                role: "user",
+                content: editedUserMessage.content,
+                files: editedUserMessage.files || null,
+                created_at: new Date().toISOString(),
+                message_number: nextMessageNumber,
+                edited: editedUserMessage.edited || false,
+                edited_at: editedUserMessage.edited_at || undefined,
+              },
+              {
+                id: randomUUID(),
+                role: "assistant",
+                content: outputText,
+                images: images.length > 0 ? images : null,
+                created_at: new Date().toISOString(),
+                message_number: nextMessageNumber + 1,
+              },
+            ];
+          } else {
+            // Normal flow: add new user message and assistant response
+            const newMessages = [
+              ...(lastUserMessage && lastUserMessage.role === "user"
+                ? [
+                    {
+                      id: randomUUID(),
+                      role: "user",
+                      content: lastUserMessage.content,
+                      files: lastUserMessage.files || null,
+                      created_at: new Date().toISOString(),
+                      message_number: nextMessageNumber,
+                    },
+                  ]
+                : []),
+              {
+                id: randomUUID(),
+                role: "assistant",
+                content: outputText,
+                images: images.length > 0 ? images : null,
+                created_at: new Date().toISOString(),
+                message_number:
+                  lastUserMessage && lastUserMessage.role === "user"
+                    ? nextMessageNumber + 1
+                    : nextMessageNumber,
+              },
+            ];
+            messagesToSave = [...existingMessages, ...newMessages];
+          }
 
           const updateData: {
             messages: Array<{
@@ -364,9 +449,11 @@ export async function POST(request: Request) {
               files?: FileAttachment[] | null;
               created_at: string;
               message_number: number;
+              edited?: boolean;
+              edited_at?: string;
             }>;
           } = {
-            messages: updatedMessages,
+            messages: messagesToSave,
           };
 
           await supabase.from("chats").update(updateData).eq("id", currentChatId);

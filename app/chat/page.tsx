@@ -6,15 +6,21 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ChatSidebar, type ChatSidebarRef } from "@/components/chat-sidebar";
 import { Navbar } from "@/components/navbar";
-import { Send, Bot, User, Loader2, Paperclip, X, Copy, Check, MoreVertical } from "lucide-react";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Paperclip,
+  X,
+  Copy,
+  Check,
+  Pencil,
+  Save,
+  XCircle,
+} from "lucide-react";
 import { GrDocumentTxt } from "react-icons/gr";
 import { FaMarkdown } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +44,8 @@ interface Message {
   content: string;
   images?: Array<{ url: string; prompt?: string }>;
   files?: FileAttachment[];
+  edited?: boolean;
+  edited_at?: string;
 }
 
 export default function ChatPage() {
@@ -53,9 +61,12 @@ export default function ChatPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
   const sidebarRef = useRef<ChatSidebarRef>(null);
   const mobileSidebarRef = useRef<ChatSidebarRef>(null);
   const titleRefreshScheduledRef = useRef<string | null>(null);
@@ -114,6 +125,190 @@ export default function ChatPage() {
     }
   };
 
+  const handleStartEdit = (messageIndex: number, content: string) => {
+    setEditingMessageIndex(messageIndex);
+    setEditingContent(content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageIndex(null);
+    setEditingContent("");
+  };
+
+  const handleSaveEdit = async (messageIndex: number) => {
+    if (!editingContent.trim() || !currentChatId) return;
+
+    // Truncate messages from this point (remove this message and all subsequent messages)
+    const truncatedMessages = messages.slice(0, messageIndex);
+
+    // Update the edited message with edited flag
+    const originalMessage = messages[messageIndex];
+    const editedMessage: Message = {
+      role: "user",
+      content: editingContent,
+      files: originalMessage.files,
+      edited: true,
+      edited_at: new Date().toISOString(),
+    };
+
+    const newMessages = [...truncatedMessages, editedMessage];
+    setMessages(newMessages);
+    setEditingMessageIndex(null);
+    setEditingContent("");
+    setIsLoading(true);
+
+    // Check if this is the first user message - if so, regenerate the title
+    const isFirstUserMessage =
+      messageIndex === 0 || truncatedMessages.findIndex((msg) => msg.role === "user") === -1;
+    if (isFirstUserMessage && editingContent.trim().length > 0) {
+      // Generate new title based on edited first message
+      fetch(`/api/chats/${currentChatId}/title`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ firstMessage: editingContent }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.title) {
+            // Update title directly without refreshing entire chat
+            sidebarRef.current?.updateChatTitle(currentChatId, data.title);
+            mobileSidebarRef.current?.updateChatTitle(currentChatId, data.title);
+          }
+        })
+        .catch((error) => {
+          console.error("Error generating title:", error);
+        });
+    }
+
+    // Send the edited message to the API
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: newMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+            files: msg.files,
+            edited: msg.edited,
+            edited_at: msg.edited_at,
+          })),
+          chatId: currentChatId,
+          isEdit: true, // Flag to indicate this is an edit operation
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get response");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessage = "";
+      let buffer = "";
+      const messageImages: Array<{ url: string; prompt?: string }> = [];
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") {
+                break;
+              }
+              if (data) {
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.content) {
+                    assistantMessage += parsed.content;
+                    setMessages([
+                      ...newMessages,
+                      {
+                        role: "assistant",
+                        content: assistantMessage,
+                        images: messageImages.length > 0 ? messageImages : undefined,
+                      },
+                    ]);
+                  } else if (parsed.type === "function_result") {
+                    try {
+                      const functionData = JSON.parse(parsed.data);
+                      if (functionData.type === "image" && functionData.url) {
+                        messageImages.push({
+                          url: functionData.url,
+                          prompt: functionData.prompt,
+                        });
+                        setMessages([
+                          ...newMessages,
+                          {
+                            role: "assistant",
+                            content: assistantMessage,
+                            images: [...messageImages],
+                          },
+                        ]);
+                      }
+                    } catch (e) {
+                      console.error("Failed to parse function result:", e, parsed.data);
+                    }
+                  }
+                } catch (e) {
+                  console.error("Failed to parse SSE data:", e, data);
+                }
+              }
+            }
+          }
+        }
+
+        if (buffer) {
+          const line = buffer.trim();
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data && data !== "[DONE]") {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  assistantMessage += parsed.content;
+                  setMessages([
+                    ...newMessages,
+                    {
+                      role: "assistant",
+                      content: assistantMessage,
+                      images: messageImages.length > 0 ? messageImages : undefined,
+                    },
+                  ]);
+                }
+              } catch (e) {
+                console.error("Failed to parse final SSE data:", e, data);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error sending edited message:", error);
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+      inputRef.current?.focus();
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -135,17 +330,35 @@ export default function ChatPage() {
     }
   }, [input]);
 
+  useEffect(() => {
+    // Focus edit textarea when entering edit mode
+    if (editingMessageIndex !== null && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.style.height = "auto";
+      const scrollHeight = editInputRef.current.scrollHeight;
+      editInputRef.current.style.height = `${Math.min(scrollHeight, 200)}px`;
+    }
+  }, [editingMessageIndex]);
+
   const markdownComponents: Components = {
-    p: ({ ...props }) => <p className="m-0 mb-2 last:mb-0" {...props} />,
-    h1: ({ ...props }) => <h1 className="text-2xl font-bold mt-4 mb-2 first:mt-0" {...props} />,
-    h2: ({ ...props }) => <h2 className="text-xl font-semibold mt-4 mb-2 first:mt-0" {...props} />,
-    h3: ({ ...props }) => <h3 className="text-lg font-semibold mt-3 mb-2 first:mt-0" {...props} />,
-    h4: ({ ...props }) => (
-      <h4 className="text-base font-semibold mt-2 mb-1 first:mt-0" {...props} />
+    p: ({ ...props }) => <p className="m-0 mb-2 last:mb-0 break-words" {...props} />,
+    h1: ({ ...props }) => (
+      <h1 className="text-2xl font-bold mt-4 mb-2 first:mt-0 break-words" {...props} />
     ),
-    ul: ({ ...props }) => <ul className="list-disc list-inside my-2 space-y-1" {...props} />,
-    ol: ({ ...props }) => <ol className="list-decimal list-inside my-2 space-y-1" {...props} />,
-    li: ({ ...props }) => <li className="ml-4" {...props} />,
+    h2: ({ ...props }) => (
+      <h2 className="text-xl font-semibold mt-4 mb-2 first:mt-0 break-words" {...props} />
+    ),
+    h3: ({ ...props }) => (
+      <h3 className="text-lg font-semibold mt-3 mb-2 first:mt-0 break-words" {...props} />
+    ),
+    h4: ({ ...props }) => (
+      <h4 className="text-base font-semibold mt-2 mb-1 first:mt-0 break-words" {...props} />
+    ),
+    ul: ({ ...props }) => <ul className="list-disc list-outside my-2 space-y-1 ml-6" {...props} />,
+    ol: ({ ...props }) => (
+      <ol className="list-decimal list-outside my-2 space-y-1 ml-6" {...props} />
+    ),
+    li: ({ ...props }) => <li className="pl-2 break-words" {...props} />,
     code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => {
       const match = /language-(\w+)/.exec(className || "");
       const isInline = !match;
@@ -163,7 +376,7 @@ export default function ChatPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 bg-background/80 hover:bg-background border border-border/50"
+              className="h-7 w-7 bg-background/80 hover:bg-transparent border border-border/50"
               onClick={() => handleCopyCode(codeString, codeId)}
             >
               {isCopied ? (
@@ -246,22 +459,40 @@ export default function ChatPage() {
       <td className="border border-primary-foreground/20 px-3 py-2" {...props} />
     ),
     hr: ({ ...props }) => <hr className="my-4 border-primary-foreground/20" {...props} />,
-    a: ({ ...props }) => <a className="underline hover:opacity-80" {...props} />,
+    a: ({ href, children, ...props }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:opacity-80 break-words text-primary-foreground/90"
+        {...props}
+      >
+        {children}
+      </a>
+    ),
     strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
     em: ({ ...props }) => <em className="italic" {...props} />,
   };
 
   const markdownComponentsDark: Components = {
-    p: ({ ...props }) => <p className="m-0 mb-2 last:mb-0" {...props} />,
-    h1: ({ ...props }) => <h1 className="text-2xl font-bold mt-4 mb-2 first:mt-0" {...props} />,
-    h2: ({ ...props }) => <h2 className="text-xl font-semibold mt-4 mb-2 first:mt-0" {...props} />,
-    h3: ({ ...props }) => <h3 className="text-lg font-semibold mt-3 mb-2 first:mt-0" {...props} />,
-    h4: ({ ...props }) => (
-      <h4 className="text-base font-semibold mt-2 mb-1 first:mt-0" {...props} />
+    p: ({ ...props }) => <p className="m-0 mb-2 last:mb-0 break-words" {...props} />,
+    h1: ({ ...props }) => (
+      <h1 className="text-2xl font-bold mt-4 mb-2 first:mt-0 break-words" {...props} />
     ),
-    ul: ({ ...props }) => <ul className="list-disc list-inside my-2 space-y-1" {...props} />,
-    ol: ({ ...props }) => <ol className="list-decimal list-inside my-2 space-y-1" {...props} />,
-    li: ({ ...props }) => <li className="ml-4" {...props} />,
+    h2: ({ ...props }) => (
+      <h2 className="text-xl font-semibold mt-4 mb-2 first:mt-0 break-words" {...props} />
+    ),
+    h3: ({ ...props }) => (
+      <h3 className="text-lg font-semibold mt-3 mb-2 first:mt-0 break-words" {...props} />
+    ),
+    h4: ({ ...props }) => (
+      <h4 className="text-base font-semibold mt-2 mb-1 first:mt-0 break-words" {...props} />
+    ),
+    ul: ({ ...props }) => <ul className="list-disc list-outside my-2 space-y-1 ml-6" {...props} />,
+    ol: ({ ...props }) => (
+      <ol className="list-decimal list-outside my-2 space-y-1 ml-6" {...props} />
+    ),
+    li: ({ ...props }) => <li className="pl-2 break-words" {...props} />,
     code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => {
       const match = /language-(\w+)/.exec(className || "");
       const isInline = !match;
@@ -279,7 +510,7 @@ export default function ChatPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 bg-background/80 hover:bg-background border border-border/50"
+              className="h-7 w-7 bg-background/80 hover:bg-transparent border border-border/50"
               onClick={() => handleCopyCode(codeString, codeId)}
             >
               {isCopied ? (
@@ -354,7 +585,17 @@ export default function ChatPage() {
     ),
     td: ({ ...props }) => <td className="border border-border px-3 py-2" {...props} />,
     hr: ({ ...props }) => <hr className="my-4 border-border" {...props} />,
-    a: ({ ...props }) => <a className="text-primary underline hover:text-primary/80" {...props} />,
+    a: ({ href, children, ...props }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline hover:text-primary/80 break-words"
+        {...props}
+      >
+        {children}
+      </a>
+    ),
     strong: ({ ...props }) => <strong className="font-semibold" {...props} />,
     em: ({ ...props }) => <em className="italic" {...props} />,
   };
@@ -371,11 +612,15 @@ export default function ChatPage() {
           content?: string;
           images?: Array<{ url: string; prompt?: string }>;
           files?: FileAttachment[];
+          edited?: boolean;
+          edited_at?: string;
         }) => ({
           role: msg.role as "user" | "assistant",
           content: msg.content || "",
           images: msg.images || undefined,
           files: msg.files || undefined,
+          edited: msg.edited || false,
+          edited_at: msg.edited_at || undefined,
         })
       );
       setMessages(loadedMessages);
@@ -757,49 +1002,147 @@ export default function ChatPage() {
                   )}
                   <Card
                     className={`group relative max-w-[80%] sm:max-w-[70%] p-4 ${
-                      message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground hover:bg-primary"
+                        : "bg-muted"
                     }`}
                   >
+                    {message.edited && message.role === "user" && (
+                      <div className="absolute top-2 right-2 text-xs text-primary-foreground/50 italic">
+                        (edited)
+                      </div>
+                    )}
                     {message.role === "user" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        {message.files && message.files.length > 0 && (
-                          <div className="space-y-2 mb-3">
-                            {message.files.map((file, idx) => (
-                              <div key={idx} className="space-y-2">
-                                <div className="flex items-center gap-2 p-2 bg-background/20 rounded border text-sm">
-                                  <Paperclip className="h-4 w-4 shrink-0" />
-                                  <span className="truncate flex-1">{file.name}</span>
-                                  <span className="text-xs opacity-80">
-                                    {(file.size / 1024).toFixed(1)} KB
-                                  </span>
-                                </div>
-                                {file.type.startsWith("image/") && (
-                                  <div className="rounded-lg overflow-hidden">
-                                    <Image
-                                      src={file.data}
-                                      alt={file.name}
-                                      width={192}
-                                      height={192}
-                                      className="max-w-xs max-h-48 rounded"
-                                      unoptimized
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                        {editingMessageIndex === index ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              ref={editInputRef}
+                              value={editingContent}
+                              onChange={(e) => setEditingContent(e.target.value)}
+                              className="min-h-[100px] bg-background/20 text-primary-foreground border-primary-foreground/30 resize-none"
+                              placeholder="Edit your message..."
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  handleCancelEdit();
+                                } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                  e.preventDefault();
+                                  handleSaveEdit(index);
+                                }
+                              }}
+                            />
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSaveEdit(index)}
+                                disabled={!editingContent.trim() || isLoading}
+                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                              >
+                                <Save className="h-3.5 w-3.5 mr-1.5" />
+                                Save & Resend
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleCancelEdit}
+                                disabled={isLoading}
+                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
-                        )}
-                        {message.content && (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={markdownComponents}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
+                        ) : (
+                          <>
+                            {message.files && message.files.length > 0 && (
+                              <div className="space-y-2 mb-3">
+                                {message.files.map((file, idx) => (
+                                  <div key={idx} className="space-y-2">
+                                    <div className="flex items-center gap-2 p-2 bg-background/20 rounded border text-sm">
+                                      <Paperclip className="h-4 w-4 shrink-0" />
+                                      <span className="truncate flex-1">{file.name}</span>
+                                      <span className="text-xs opacity-80">
+                                        {(file.size / 1024).toFixed(1)} KB
+                                      </span>
+                                    </div>
+                                    {file.type.startsWith("image/") && (
+                                      <div className="rounded-lg overflow-hidden">
+                                        <Image
+                                          src={file.data}
+                                          alt={file.name}
+                                          width={192}
+                                          height={192}
+                                          className="max-w-xs max-h-48 rounded"
+                                          unoptimized
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {message.content && (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={markdownComponents}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            )}
+                            <div className="mt-3 pt-2 border-t border-primary-foreground/20 flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                onClick={() => handleStartEdit(index, message.content)}
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                onClick={() => handleCopyAsMarkdown(message.content, index)}
+                              >
+                                {copiedMessageId === `markdown-${index}` ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
+                                    Copy MD
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                onClick={() => handleCopyAsPlaintext(message.content, index)}
+                              >
+                                {copiedMessageId === `plaintext-${index}` ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
+                                    Copy TXT
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </>
                         )}
                       </div>
                     ) : (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
                         {message.images && message.images.length > 0 && (
                           <div className="space-y-2 mb-3">
                             {message.images.map((img, idx) => (
@@ -856,53 +1199,43 @@ export default function ChatPage() {
                             {message.content}
                           </ReactMarkdown>
                         )}
-                        <div className="mt-3 pt-2 border-t border-border/50">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                <MoreVertical className="h-3.5 w-3.5 mr-1.5" />
-                                Copy
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem
-                                onClick={() => handleCopyAsMarkdown(message.content, index)}
-                                className="cursor-pointer"
-                              >
-                                {copiedMessageId === `markdown-${index}` ? (
-                                  <>
-                                    <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-                                    Copied as Markdown
-                                  </>
-                                ) : (
-                                  <>
-                                    <FaMarkdown className="h-4 w-4 mr-2" />
-                                    Copy as Markdown
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleCopyAsPlaintext(message.content, index)}
-                                className="cursor-pointer"
-                              >
-                                {copiedMessageId === `plaintext-${index}` ? (
-                                  <>
-                                    <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-                                    Copied as Plaintext
-                                  </>
-                                ) : (
-                                  <>
-                                    <GrDocumentTxt className="h-4 w-4 mr-2" />
-                                    Copy as Plaintext
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                            onClick={() => handleCopyAsMarkdown(message.content, index)}
+                          >
+                            {copiedMessageId === `markdown-${index}` ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
+                                Copy MD
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                            onClick={() => handleCopyAsPlaintext(message.content, index)}
+                          >
+                            {copiedMessageId === `plaintext-${index}` ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
+                                Copy TXT
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -954,7 +1287,7 @@ export default function ChatPage() {
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="hover:bg-background/50 rounded p-0.5"
+                        className="hover:opacity-70 rounded p-0.5"
                       >
                         <X className="h-3 w-3" />
                       </button>

@@ -60,7 +60,7 @@ export const Navbar = ({
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="text-sm font-medium hover:opacity-80 transition-opacity">
+                <button className="text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer">
                   {user.email}
                 </button>
               </DropdownMenuTrigger>
