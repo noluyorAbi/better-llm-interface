@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: `${siteUrl}/og`,
+        url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
         alt: "Intelligent LLM Interface - Modern AI Interaction Platform",
@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: `${siteUrl}/og`,
+        url: `${siteUrl}/twitter-image`,
         width: 1200,
         height: 630,
         alt: "Intelligent LLM Interface - Modern AI Interaction Platform",
@@ -109,7 +109,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   category: "technology",
   other: {
-    "og:image:secure_url": `${siteUrl}/og`,
+    "og:image:secure_url": `${siteUrl}/opengraph-image`,
     "og:image:type": "image/png",
     classification: "Technology, AI, Education",
   },
