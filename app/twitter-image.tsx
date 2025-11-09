@@ -18,8 +18,7 @@ export default async function Image() {
           flexDirection: "column",
           alignItems: "flex-start",
           justifyContent: "center",
-          background:
-            "linear-gradient(135deg, #020817 0%, #020814 40%, #020817 100%)",
+          background: "linear-gradient(135deg, #020817 0%, #020814 40%, #020817 100%)",
           fontFamily:
             "-apple-system, system-ui, -system-ui, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
           position: "relative",
@@ -35,8 +34,7 @@ export default async function Image() {
             left: 0,
             right: 0,
             bottom: 0,
-            background:
-              "radial-gradient(circle at 0% 0%, #111827 0%, transparent 70%)",
+            background: "radial-gradient(circle at 0% 0%, #111827 0%, transparent 70%)",
             opacity: 0.9,
           }}
         />
@@ -47,8 +45,7 @@ export default async function Image() {
             left: 0,
             right: 0,
             bottom: 0,
-            background:
-              "radial-gradient(circle at 100% 40%, #111827 0%, transparent 70%)",
+            background: "radial-gradient(circle at 100% 40%, #111827 0%, transparent 70%)",
             opacity: 0.9,
           }}
         />
@@ -247,8 +244,7 @@ export default async function Image() {
                 alignItems: "center",
                 padding: "0 24px",
                 height: "40px",
-                background:
-                  "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
                 borderRadius: "18px",
                 border: "1px solid #111827",
               }}
@@ -280,8 +276,7 @@ export default async function Image() {
                 alignItems: "center",
                 padding: "0 24px",
                 height: "40px",
-                background:
-                  "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
                 borderRadius: "18px",
                 border: "1px solid #111827",
               }}
@@ -313,8 +308,7 @@ export default async function Image() {
                 alignItems: "center",
                 padding: "0 24px",
                 height: "40px",
-                background:
-                  "linear-gradient(135deg, #020817 0%, #111827 100%)",
+                background: "linear-gradient(135deg, #020817 0%, #111827 100%)",
                 borderRadius: "18px",
                 border: "1px solid #111827",
               }}
@@ -423,4 +417,3 @@ export default async function Image() {
     }
   );
 }
-
