@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const {
@@ -12,6 +12,32 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const chatId = searchParams.get("id");
+
+    // If chatId is provided, return a single chat
+    if (chatId) {
+      const { data: chat, error } = await supabase
+        .from("chats")
+        .select("id, title, created_at, updated_at, messages")
+        .eq("id", chatId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching chat:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        chat: {
+          ...chat,
+          messages: Array.isArray(chat?.messages) ? chat.messages : chat?.messages || [],
+        },
+      });
+    }
+
+    // Otherwise, return all chats
     const { data: chats, error } = await supabase
       .from("chats")
       .select("id, title, created_at, updated_at, messages")

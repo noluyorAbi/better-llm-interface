@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChatSidebar } from "@/components/chat-sidebar";
+import { ChatSidebar, type ChatSidebarRef } from "@/components/chat-sidebar";
 import { Navbar } from "@/components/navbar";
 import { Send, Bot, User, Loader2, Paperclip, X, Copy, Check, MoreVertical } from "lucide-react";
 import { GrDocumentTxt } from "react-icons/gr";
@@ -49,7 +49,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [sidebarKey, setSidebarKey] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<FileAttachment[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
@@ -57,6 +56,9 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<ChatSidebarRef>(null);
+  const mobileSidebarRef = useRef<ChatSidebarRef>(null);
+  const titleRefreshScheduledRef = useRef<string | null>(null);
 
   const isDark = resolvedTheme === "dark" || theme === "dark";
   const codeTheme = isDark ? oneDark : oneLight;
@@ -465,6 +467,65 @@ export default function ChatPage() {
       inputRef.current.style.height = "auto";
     }
 
+    let chatIdToUse = currentChatId;
+
+    // Create chat immediately if this is the first message for instant UI feedback
+    if (!chatIdToUse) {
+      try {
+        const tempTitle = input.slice(0, 50) || "New Chat";
+        const createResponse = await fetch("/api/chats", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ title: tempTitle }),
+        });
+
+        if (createResponse.ok) {
+          const { chat } = await createResponse.json();
+          chatIdToUse = chat.id;
+          setCurrentChatId(chat.id);
+
+          // Add chat optimistically to sidebar without re-rendering entire list
+          const chatToAdd = {
+            ...chat,
+            messages: [],
+          };
+          sidebarRef.current?.addChat(chatToAdd);
+          mobileSidebarRef.current?.addChat(chatToAdd);
+
+          // Generate and update title immediately
+          if (!titleRefreshScheduledRef.current && input.trim().length > 0) {
+            titleRefreshScheduledRef.current = chat.id;
+
+            // Call title generation API immediately
+            fetch(`/api/chats/${chat.id}/title`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ firstMessage: input }),
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.title) {
+                  // Update title directly without refreshing entire chat
+                  sidebarRef.current?.updateChatTitle(chat.id, data.title);
+                  mobileSidebarRef.current?.updateChatTitle(chat.id, data.title);
+                }
+                titleRefreshScheduledRef.current = null;
+              })
+              .catch((error) => {
+                console.error("Error generating title:", error);
+                titleRefreshScheduledRef.current = null;
+              });
+          }
+        }
+      } catch (error) {
+        console.error("Error creating chat:", error);
+      }
+    }
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -477,7 +538,7 @@ export default function ChatPage() {
             content: msg.content,
             files: msg.files,
           })),
-          chatId: currentChatId,
+          chatId: chatIdToUse,
         }),
       });
 
@@ -540,8 +601,37 @@ export default function ChatPage() {
                       console.error("Failed to parse function result:", e, parsed.data);
                     }
                   } else if (parsed.type === "chat_id" && parsed.chatId) {
-                    setCurrentChatId(parsed.chatId);
-                    setSidebarKey((prev) => prev + 1);
+                    // Chat ID received from API (fallback if frontend creation failed)
+                    if (!currentChatId) {
+                      setCurrentChatId(parsed.chatId);
+
+                      // Fetch and add chat to sidebar
+                      fetch(`/api/chats?id=${parsed.chatId}`)
+                        .then((res) => res.json())
+                        .then((data) => {
+                          if (data.chat) {
+                            const chatToAdd = {
+                              ...data.chat,
+                              messages: Array.isArray(data.chat.messages) ? data.chat.messages : [],
+                            };
+                            sidebarRef.current?.addChat(chatToAdd);
+                            mobileSidebarRef.current?.addChat(chatToAdd);
+
+                            // Refresh once after a delay to catch AI-generated title (backend generates it asynchronously)
+                            if (!titleRefreshScheduledRef.current) {
+                              titleRefreshScheduledRef.current = parsed.chatId;
+                              setTimeout(() => {
+                                sidebarRef.current?.refreshChat(parsed.chatId);
+                                mobileSidebarRef.current?.refreshChat(parsed.chatId);
+                                titleRefreshScheduledRef.current = null;
+                              }, 3000);
+                            }
+                          }
+                        })
+                        .catch((error) => {
+                          console.error("Error fetching chat:", error);
+                        });
+                    }
                   }
                 } catch (e) {
                   console.error("Failed to parse SSE data:", e, data);
@@ -606,9 +696,9 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
-      <div className="w-72 border-r bg-background hidden lg:flex flex-col sticky top-0 h-screen">
+      <div className="w-72 border-r bg-background hidden lg:flex flex-col sticky top-0 h-screen overflow-hidden">
         <ChatSidebar
-          key={sidebarKey}
+          ref={sidebarRef}
           currentChatId={currentChatId}
           onChatSelect={handleChatSelect}
           onNewChat={handleNewChat}
@@ -627,7 +717,7 @@ export default function ChatPage() {
           onMobileMenuOpenChange={setMobileMenuOpen}
           mobileMenuContent={
             <ChatSidebar
-              key={sidebarKey}
+              ref={mobileSidebarRef}
               currentChatId={currentChatId}
               onChatSelect={handleChatSelect}
               onNewChat={handleNewChat}

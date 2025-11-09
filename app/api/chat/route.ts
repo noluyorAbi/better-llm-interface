@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { generateChatTitle } from "@/lib/services/chat-title-generator";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -37,13 +38,16 @@ export async function POST(request: Request) {
 
     if (!currentChatId) {
       const firstUserMessage = messages.find((msg: { role: string }) => msg.role === "user");
-      const title = firstUserMessage?.content?.slice(0, 50) || "New Chat";
+      const firstMessageContent = firstUserMessage?.content || "";
+
+      // Create chat immediately with temporary title for instant UI feedback
+      const tempTitle = firstMessageContent.slice(0, 50) || "New Chat";
 
       const { data: newChat, error: chatError } = await supabase
         .from("chats")
         .insert({
           user_id: user.id,
-          title: title,
+          title: tempTitle,
         })
         .select()
         .single();
@@ -54,6 +58,21 @@ export async function POST(request: Request) {
       }
 
       currentChatId = newChat.id;
+
+      // Generate AI title asynchronously and update in background
+      if (firstMessageContent.trim().length > 0) {
+        generateChatTitle(firstMessageContent)
+          .then(async (aiTitle) => {
+            try {
+              await supabase.from("chats").update({ title: aiTitle }).eq("id", currentChatId);
+            } catch (error) {
+              console.error("Error updating chat title:", error);
+            }
+          })
+          .catch((error: unknown) => {
+            console.error("Error generating chat title:", error);
+          });
+      }
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -285,6 +304,24 @@ export async function POST(request: Request) {
               }))
             : [];
 
+          // Generate AI title if this is the first message in an existing chat
+          if (existingMessages.length === 0 && lastUserMessage && lastUserMessage.role === "user") {
+            const firstMessageContent = lastUserMessage.content || "";
+            if (firstMessageContent.trim().length > 0) {
+              generateChatTitle(firstMessageContent)
+                .then(async (aiTitle) => {
+                  try {
+                    await supabase.from("chats").update({ title: aiTitle }).eq("id", currentChatId);
+                  } catch (error) {
+                    console.error("Error updating chat title:", error);
+                  }
+                })
+                .catch((error: unknown) => {
+                  console.error("Error generating chat title:", error);
+                });
+            }
+          }
+
           const nextMessageNumber =
             existingMessages.length > 0
               ? Math.max(...existingMessages.map((msg) => msg.message_number || 0), 0) + 1
@@ -328,14 +365,9 @@ export async function POST(request: Request) {
               created_at: string;
               message_number: number;
             }>;
-            title?: string;
           } = {
             messages: updatedMessages,
           };
-
-          if (messages.length === 1 && lastUserMessage) {
-            updateData.title = lastUserMessage.content.slice(0, 50);
-          }
 
           await supabase.from("chats").update(updateData).eq("id", currentChatId);
         } catch (error) {
