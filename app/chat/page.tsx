@@ -183,6 +183,18 @@ export default function ChatPage() {
     }
 
     // Send the edited message to the API
+    // Add empty assistant message immediately for progressive rendering
+    const assistantMessageIndex = newMessages.length;
+    setMessages([
+      ...newMessages,
+      {
+        role: "assistant",
+        content: "",
+        images: undefined,
+      },
+    ]);
+    setIsLoading(false); // Hide "Thinking..." immediately, show streaming message card instead
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -232,30 +244,38 @@ export default function ChatPage() {
                   const parsed = JSON.parse(data);
                   if (parsed.content) {
                     assistantMessage += parsed.content;
-                    setMessages([
-                      ...newMessages,
-                      {
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      updated[assistantMessageIndex] = {
                         role: "assistant",
                         content: assistantMessage,
                         images: messageImages.length > 0 ? messageImages : undefined,
-                      },
-                    ]);
+                      };
+                      return updated;
+                    });
                   } else if (parsed.type === "function_result") {
                     try {
                       const functionData = JSON.parse(parsed.data);
                       if (functionData.type === "image" && functionData.url) {
-                        messageImages.push({
-                          url: functionData.url,
-                          prompt: functionData.prompt,
-                        });
-                        setMessages([
-                          ...newMessages,
-                          {
-                            role: "assistant",
-                            content: assistantMessage,
-                            images: [...messageImages],
-                          },
-                        ]);
+                        // Check if image already exists to prevent duplicates
+                        const imageExists = messageImages.some(
+                          (img) => img.url === functionData.url
+                        );
+                        if (!imageExists) {
+                          messageImages.push({
+                            url: functionData.url,
+                            prompt: functionData.prompt,
+                          });
+                          setMessages((prev) => {
+                            const updated = [...prev];
+                            updated[assistantMessageIndex] = {
+                              role: "assistant",
+                              content: assistantMessage,
+                              images: [...messageImages],
+                            };
+                            return updated;
+                          });
+                        }
                       }
                     } catch (e) {
                       console.error("Failed to parse function result:", e, parsed.data);
@@ -278,14 +298,15 @@ export default function ChatPage() {
                 const parsed = JSON.parse(data);
                 if (parsed.content) {
                   assistantMessage += parsed.content;
-                  setMessages([
-                    ...newMessages,
-                    {
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[assistantMessageIndex] = {
                       role: "assistant",
                       content: assistantMessage,
                       images: messageImages.length > 0 ? messageImages : undefined,
-                    },
-                  ]);
+                    };
+                    return updated;
+                  });
                 }
               } catch (e) {
                 console.error("Failed to parse final SSE data:", e, data);
@@ -296,13 +317,21 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error sending edited message:", error);
-      setMessages([
-        ...newMessages,
-        {
-          role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
-        },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated[assistantMessageIndex]) {
+          updated[assistantMessageIndex] = {
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          };
+        } else {
+          updated.push({
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          });
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -771,6 +800,18 @@ export default function ChatPage() {
       }
     }
 
+    // Add empty assistant message immediately for progressive rendering
+    const assistantMessageIndex = newMessages.length;
+    setMessages([
+      ...newMessages,
+      {
+        role: "assistant",
+        content: "",
+        images: undefined,
+      },
+    ]);
+    setIsLoading(false); // Hide "Thinking..." immediately, show streaming message card instead
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -817,30 +858,38 @@ export default function ChatPage() {
                   const parsed = JSON.parse(data);
                   if (parsed.content) {
                     assistantMessage += parsed.content;
-                    setMessages([
-                      ...newMessages,
-                      {
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      updated[assistantMessageIndex] = {
                         role: "assistant",
                         content: assistantMessage,
                         images: messageImages.length > 0 ? messageImages : undefined,
-                      },
-                    ]);
+                      };
+                      return updated;
+                    });
                   } else if (parsed.type === "function_result") {
                     try {
                       const functionData = JSON.parse(parsed.data);
                       if (functionData.type === "image" && functionData.url) {
-                        messageImages.push({
-                          url: functionData.url,
-                          prompt: functionData.prompt,
-                        });
-                        setMessages([
-                          ...newMessages,
-                          {
-                            role: "assistant",
-                            content: assistantMessage,
-                            images: [...messageImages],
-                          },
-                        ]);
+                        // Check if image already exists to prevent duplicates
+                        const imageExists = messageImages.some(
+                          (img) => img.url === functionData.url
+                        );
+                        if (!imageExists) {
+                          messageImages.push({
+                            url: functionData.url,
+                            prompt: functionData.prompt,
+                          });
+                          setMessages((prev) => {
+                            const updated = [...prev];
+                            updated[assistantMessageIndex] = {
+                              role: "assistant",
+                              content: assistantMessage,
+                              images: [...messageImages],
+                            };
+                            return updated;
+                          });
+                        }
                       }
                     } catch (e) {
                       console.error("Failed to parse function result:", e, parsed.data);
@@ -895,14 +944,15 @@ export default function ChatPage() {
                 const parsed = JSON.parse(data);
                 if (parsed.content) {
                   assistantMessage += parsed.content;
-                  setMessages([
-                    ...newMessages,
-                    {
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[assistantMessageIndex] = {
                       role: "assistant",
                       content: assistantMessage,
                       images: messageImages.length > 0 ? messageImages : undefined,
-                    },
-                  ]);
+                    };
+                    return updated;
+                  });
                 }
               } catch (e) {
                 console.error("Failed to parse final SSE data:", e, data);
@@ -913,13 +963,21 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages([
-        ...newMessages,
-        {
-          role: "assistant",
-          content: "Sorry, I encountered an error. Please try again.",
-        },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated[assistantMessageIndex]) {
+          updated[assistantMessageIndex] = {
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          };
+        } else {
+          updated.push({
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          });
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -1191,52 +1249,59 @@ export default function ChatPage() {
                             ))}
                           </div>
                         )}
-                        {message.content && (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={markdownComponentsDark}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
+                        {message.content ? (
+                          <>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={markdownComponentsDark}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                            <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                                onClick={() => handleCopyAsMarkdown(message.content, index)}
+                              >
+                                {copiedMessageId === `markdown-${index}` ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
+                                    Copy MD
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                                onClick={() => handleCopyAsPlaintext(message.content, index)}
+                              >
+                                {copiedMessageId === `plaintext-${index}` ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
+                                    Copy TXT
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2 text-muted-foreground py-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Thinking...</span>
+                          </div>
                         )}
-                        <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
-                            onClick={() => handleCopyAsMarkdown(message.content, index)}
-                          >
-                            {copiedMessageId === `markdown-${index}` ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
-                                Copy MD
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
-                            onClick={() => handleCopyAsPlaintext(message.content, index)}
-                          >
-                            {copiedMessageId === `plaintext-${index}` ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
-                                Copy TXT
-                              </>
-                            )}
-                          </Button>
-                        </div>
                       </div>
                     )}
                   </Card>
