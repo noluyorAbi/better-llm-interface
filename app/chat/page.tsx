@@ -6,14 +6,25 @@ import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { Navbar } from "@/components/navbar";
-import { Send, Bot, User, Loader2, Paperclip, X } from "lucide-react";
+import { Send, Bot, User, Loader2, Paperclip, X, Copy, Check, MoreVertical } from "lucide-react";
+import { GrDocumentTxt } from "react-icons/gr";
+import { FaMarkdown } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "next-themes";
 
 interface FileAttachment {
   name: string;
@@ -32,6 +43,7 @@ interface Message {
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { theme, resolvedTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -40,9 +52,65 @@ export default function ChatPage() {
   const [sidebarKey, setSidebarKey] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<FileAttachment[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isDark = resolvedTheme === "dark" || theme === "dark";
+  const codeTheme = isDark ? oneDark : oneLight;
+
+  const handleCopyCode = async (code: string, codeId: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCodeId(codeId);
+      setTimeout(() => setCopiedCodeId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy code:", error);
+    }
+  };
+
+  const generateCodeId = (code: string) => {
+    let hash = 0;
+    for (let i = 0; i < code.length; i++) {
+      const char = code.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return `code-${Math.abs(hash)}`;
+  };
+
+  const handleCopyAsMarkdown = async (content: string, messageIndex: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(`markdown-${messageIndex}`);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy as markdown:", error);
+    }
+  };
+
+  const handleCopyAsPlaintext = async (content: string, messageIndex: number) => {
+    try {
+      // Strip markdown formatting for plaintext
+      const plainText = content
+        .replace(/#{1,6}\s+/g, "") // Remove headers
+        .replace(/\*\*(.*?)\*\*/g, "$1") // Remove bold
+        .replace(/\*(.*?)\*/g, "$1") // Remove italic
+        .replace(/`(.*?)`/g, "$1") // Remove inline code
+        .replace(/```[\s\S]*?```/g, "") // Remove code blocks
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1") // Remove links, keep text
+        .replace(/^\s*[-*+]\s+/gm, "") // Remove list markers
+        .replace(/^\s*\d+\.\s+/gm, "") // Remove numbered list markers
+        .trim();
+      await navigator.clipboard.writeText(plainText);
+      setCopiedMessageId(`plaintext-${messageIndex}`);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy as plaintext:", error);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -76,24 +144,57 @@ export default function ChatPage() {
     ul: ({ ...props }) => <ul className="list-disc list-inside my-2 space-y-1" {...props} />,
     ol: ({ ...props }) => <ol className="list-decimal list-inside my-2 space-y-1" {...props} />,
     li: ({ ...props }) => <li className="ml-4" {...props} />,
-    code: ({ className, children, ...props }) => {
+    code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => {
       const match = /language-(\w+)/.exec(className || "");
       const isInline = !match;
+      const codeString = String(children).replace(/\n$/, "");
+      const codeId = generateCodeId(codeString);
+      const isCopied = copiedCodeId === codeId;
+
       return isInline ? (
         <code className="bg-background/30 px-1 py-0.5 rounded text-sm font-mono" {...props}>
           {children}
         </code>
       ) : (
-        <code
-          className={`language-${match[1]} block bg-background/30 p-3 rounded-lg overflow-x-auto text-sm font-mono my-2`}
-          {...props}
-        >
-          {children}
-        </code>
+        <div className="group relative my-2 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+          <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-background/80 hover:bg-background border border-border/50"
+              onClick={() => handleCopyCode(codeString, codeId)}
+            >
+              {isCopied ? (
+                <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+          <SyntaxHighlighter
+            language={match ? match[1] : "text"}
+            style={codeTheme as Record<string, React.CSSProperties>}
+            PreTag="div"
+            customStyle={{
+              margin: 0,
+              padding: "1rem",
+              fontSize: "0.875rem",
+              background: "transparent",
+            }}
+            codeTagProps={{
+              style: {
+                fontFamily: "var(--font-geist-mono), monospace",
+              } as React.CSSProperties,
+            }}
+            {...(props as Record<string, unknown>)}
+          >
+            {codeString}
+          </SyntaxHighlighter>
+        </div>
       );
     },
-    pre: ({ children, ...props }) => {
-      // If the child is a code element, don't wrap it in another pre
+    pre: ({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) => {
+      // If the child is a code element with syntax highlighting, don't wrap it
       if (
         children &&
         typeof children === "object" &&
@@ -103,6 +204,15 @@ export default function ChatPage() {
         "className" in children.props &&
         typeof children.props.className === "string" &&
         children.props.className.includes("language-")
+      ) {
+        return <>{children}</>;
+      }
+      // If it's a SyntaxHighlighter component, don't wrap it
+      if (
+        children &&
+        typeof children === "object" &&
+        "type" in children &&
+        children.type === SyntaxHighlighter
       ) {
         return <>{children}</>;
       }
@@ -150,24 +260,57 @@ export default function ChatPage() {
     ul: ({ ...props }) => <ul className="list-disc list-inside my-2 space-y-1" {...props} />,
     ol: ({ ...props }) => <ol className="list-decimal list-inside my-2 space-y-1" {...props} />,
     li: ({ ...props }) => <li className="ml-4" {...props} />,
-    code: ({ className, children, ...props }) => {
+    code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => {
       const match = /language-(\w+)/.exec(className || "");
       const isInline = !match;
+      const codeString = String(children).replace(/\n$/, "");
+      const codeId = generateCodeId(codeString);
+      const isCopied = copiedCodeId === codeId;
+
       return isInline ? (
         <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono" {...props}>
           {children}
         </code>
       ) : (
-        <code
-          className={`language-${match[1]} block bg-muted p-3 rounded-lg overflow-x-auto text-sm font-mono my-2`}
-          {...props}
-        >
-          {children}
-        </code>
+        <div className="group relative my-2 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+          <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-background/80 hover:bg-background border border-border/50"
+              onClick={() => handleCopyCode(codeString, codeId)}
+            >
+              {isCopied ? (
+                <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+          <SyntaxHighlighter
+            language={match ? match[1] : "text"}
+            style={codeTheme as Record<string, React.CSSProperties>}
+            PreTag="div"
+            customStyle={{
+              margin: 0,
+              padding: "1rem",
+              fontSize: "0.875rem",
+              background: "transparent",
+            }}
+            codeTagProps={{
+              style: {
+                fontFamily: "var(--font-geist-mono), monospace",
+              } as React.CSSProperties,
+            }}
+            {...(props as Record<string, unknown>)}
+          >
+            {codeString}
+          </SyntaxHighlighter>
+        </div>
       );
     },
-    pre: ({ children, ...props }) => {
-      // If the child is a code element, don't wrap it in another pre
+    pre: ({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) => {
+      // If the child is a code element with syntax highlighting, don't wrap it
       if (
         children &&
         typeof children === "object" &&
@@ -177,6 +320,15 @@ export default function ChatPage() {
         "className" in children.props &&
         typeof children.props.className === "string" &&
         children.props.className.includes("language-")
+      ) {
+        return <>{children}</>;
+      }
+      // If it's a SyntaxHighlighter component, don't wrap it
+      if (
+        children &&
+        typeof children === "object" &&
+        "type" in children &&
+        children.type === SyntaxHighlighter
       ) {
         return <>{children}</>;
       }
@@ -506,7 +658,7 @@ export default function ChatPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex gap-3 items-center ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {message.role === "assistant" && (
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -514,7 +666,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <Card
-                    className={`max-w-[80%] sm:max-w-[70%] p-4 ${
+                    className={`group relative max-w-[80%] sm:max-w-[70%] p-4 ${
                       message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                     }`}
                   >
@@ -614,6 +766,54 @@ export default function ChatPage() {
                             {message.content}
                           </ReactMarkdown>
                         )}
+                        <div className="mt-3 pt-2 border-t border-border/50">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5 mr-1.5" />
+                                Copy
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem
+                                onClick={() => handleCopyAsMarkdown(message.content, index)}
+                                className="cursor-pointer"
+                              >
+                                {copiedMessageId === `markdown-${index}` ? (
+                                  <>
+                                    <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                                    Copied as Markdown
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaMarkdown className="h-4 w-4 mr-2" />
+                                    Copy as Markdown
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleCopyAsPlaintext(message.content, index)}
+                                className="cursor-pointer"
+                              >
+                                {copiedMessageId === `plaintext-${index}` ? (
+                                  <>
+                                    <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                                    Copied as Plaintext
+                                  </>
+                                ) : (
+                                  <>
+                                    <GrDocumentTxt className="h-4 w-4 mr-2" />
+                                    Copy as Plaintext
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     )}
                   </Card>
@@ -630,12 +830,12 @@ export default function ChatPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 justify-start"
+                className="flex gap-3 justify-start items-center"
               >
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
-                <Card className="bg-muted p-4">
+                <Card className="max-w-[80%] sm:max-w-[70%] bg-muted p-4">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Thinking...</span>

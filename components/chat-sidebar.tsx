@@ -7,6 +7,16 @@ import { MessageSquare, Plus, Trash2, Loader2, Search, FileText, Tag } from "luc
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Chat {
   id: string;
@@ -37,6 +47,8 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<{ id: string; title: string } | null>(null);
   const isInitialLoadRef = useRef(true);
 
   const fetchChats = useCallback(async () => {
@@ -68,22 +80,29 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
     fetchChats();
   }, [currentChatId, fetchChats]);
 
-  const handleDelete = async (chatId: string, e: React.MouseEvent) => {
+  const handleDeleteClick = (chatId: string, chatTitle: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this chat?")) return;
+    setChatToDelete({ id: chatId, title: chatTitle });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!chatToDelete) return;
 
     try {
-      setDeletingId(chatId);
-      const response = await fetch(`/api/chats?id=${chatId}`, {
+      setDeletingId(chatToDelete.id);
+      const response = await fetch(`/api/chats?id=${chatToDelete.id}`, {
         method: "DELETE",
       });
 
       if (!response.ok) throw new Error("Failed to delete chat");
 
-      setChats(chats.filter((chat) => chat.id !== chatId));
-      if (currentChatId === chatId) {
+      setChats(chats.filter((chat) => chat.id !== chatToDelete.id));
+      if (currentChatId === chatToDelete.id) {
         onNewChat();
       }
+      setDeleteDialogOpen(false);
+      setChatToDelete(null);
     } catch (error) {
       console.error("Error deleting chat:", error);
       alert("Failed to delete chat");
@@ -257,7 +276,10 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
                       </div>
                       <AnimatePresence>
                         {dateChats.map((chat) => {
-                          const isToday = formatDate(chat.updated_at) === "Today";
+                          const formattedDate = formatDate(chat.updated_at);
+                          const isToday = formattedDate === "Today";
+                          const isYesterday = formattedDate === "Yesterday";
+                          const showTime = isToday || isYesterday;
                           const chatWithMatch = chat as ChatWithMatch;
                           const messageCount = Array.isArray(chat.messages)
                             ? chat.messages.length
@@ -305,12 +327,14 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className={`absolute right-1.5 top-2.5 h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+                                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer ${
                                       isActive
                                         ? "hover:bg-sidebar-accent-foreground/10 text-sidebar-foreground/70"
                                         : "hover:bg-sidebar-accent text-sidebar-foreground/50"
                                     }`}
-                                    onClick={(e) => handleDelete(chat.id, e)}
+                                    onClick={(e) =>
+                                      handleDeleteClick(chat.id, chat.title || "New Chat", e)
+                                    }
                                     disabled={deletingId === chat.id}
                                   >
                                     {deletingId === chat.id ? (
@@ -327,7 +351,7 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
                                           : "text-sidebar-foreground/50"
                                       }`}
                                     >
-                                      {isToday
+                                      {showTime
                                         ? formatTime(chat.updated_at)
                                         : formatDate(chat.updated_at)}
                                     </span>
@@ -399,6 +423,28 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat }: ChatSide
           )}
         </div>
       </ScrollArea>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the chat &ldquo;
+              <span className="font-bold">{chatToDelete?.title || "this conversation"}</span>
+              &rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChatToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
