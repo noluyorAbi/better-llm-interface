@@ -20,6 +20,7 @@ import {
   Pencil,
   Save,
   XCircle,
+  Square,
 } from "lucide-react";
 import { GrDocumentTxt } from "react-icons/gr";
 import { FaMarkdown } from "react-icons/fa";
@@ -52,7 +53,9 @@ export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
-  const chatId = params?.chatId as string | undefined;
+  const urlChatId = params?.chatId as string | undefined;
+  const [currentChatId, setCurrentChatId] = useState<string | undefined>(urlChatId);
+  const chatId = currentChatId;
   const { theme, resolvedTheme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -71,6 +74,8 @@ export default function ChatPage() {
   const sidebarRef = useRef<ChatSidebarRef>(null);
   const mobileSidebarRef = useRef<ChatSidebarRef>(null);
   const titleRefreshScheduledRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesChatIdRef = useRef<string | undefined>(undefined);
 
   const isDark = resolvedTheme === "dark" || theme === "dark";
   const codeTheme = isDark ? oneDark : oneLight;
@@ -247,11 +252,13 @@ export default function ChatPage() {
                     assistantMessage += parsed.content;
                     setMessages((prev) => {
                       const updated = [...prev];
-                      updated[assistantMessageIndex] = {
-                        role: "assistant",
-                        content: assistantMessage,
-                        images: messageImages.length > 0 ? messageImages : undefined,
-                      };
+                      if (assistantMessageIndex >= 0 && assistantMessageIndex < updated.length) {
+                        updated[assistantMessageIndex] = {
+                          role: "assistant",
+                          content: assistantMessage,
+                          images: messageImages.length > 0 ? messageImages : undefined,
+                        };
+                      }
                       return updated;
                     });
                   } else if (parsed.type === "function_result") {
@@ -269,11 +276,16 @@ export default function ChatPage() {
                           });
                           setMessages((prev) => {
                             const updated = [...prev];
-                            updated[assistantMessageIndex] = {
-                              role: "assistant",
-                              content: assistantMessage,
-                              images: [...messageImages],
-                            };
+                            if (
+                              assistantMessageIndex >= 0 &&
+                              assistantMessageIndex < updated.length
+                            ) {
+                              updated[assistantMessageIndex] = {
+                                role: "assistant",
+                                content: assistantMessage,
+                                images: [...messageImages],
+                              };
+                            }
                             return updated;
                           });
                         }
@@ -370,14 +382,28 @@ export default function ChatPage() {
     }
   }, [editingMessageIndex]);
 
-  // Load messages when chatId changes
+  // Sync currentChatId with URL params (only when URL changes externally, e.g., browser navigation)
+  useEffect(() => {
+    if (urlChatId && urlChatId !== currentChatId && urlChatId !== "new") {
+      setCurrentChatId(urlChatId);
+    }
+  }, [urlChatId]);
+
+  // Load messages when chatId changes (but not if messages already exist for this chat)
   useEffect(() => {
     if (chatId && chatId !== "new") {
-      loadChatMessages(chatId);
+      // Only load messages if:
+      // 1. Messages are not already loaded for this chat ID
+      // 2. Not currently loading/streaming
+      if (messagesChatIdRef.current !== chatId && !isLoading && !loadingMessages) {
+        loadChatMessages(chatId);
+        messagesChatIdRef.current = chatId;
+      }
     } else {
       setMessages([]);
+      messagesChatIdRef.current = undefined;
     }
-  }, [chatId]);
+  }, [chatId, isLoading, loadingMessages]);
 
   const markdownComponents: Components = {
     p: ({ ...props }) => <p className="m-0 mb-2 last:mb-0 break-words" {...props} />,
@@ -671,7 +697,15 @@ export default function ChatPage() {
   };
 
   const handleChatSelect = (selectedChatId: string) => {
-    router.push(`/chat/${selectedChatId}`);
+    setCurrentChatId(selectedChatId);
+    // Use history API for smooth navigation without re-render
+    if (typeof window !== "undefined") {
+      window.history.pushState(
+        { ...window.history.state, chatId: selectedChatId },
+        "",
+        `/chat/${selectedChatId}`
+      );
+    }
     setMobileMenuOpen(false);
   };
 
@@ -729,6 +763,28 @@ export default function ChatPage() {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+
+    // Remove the empty assistant message if it exists and has no content
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (
+        lastMessage &&
+        lastMessage.role === "assistant" &&
+        !lastMessage.content &&
+        !lastMessage.images
+      ) {
+        return prev.slice(0, -1);
+      }
+      return prev;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
@@ -766,8 +822,6 @@ export default function ChatPage() {
         if (createResponse.ok) {
           const { chat } = await createResponse.json();
           chatIdToUse = chat.id;
-          // Navigate to the new chat URL
-          router.push(`/chat/${chat.id}`);
 
           // Add chat optimistically to sidebar without re-rendering entire list
           const chatToAdd = {
@@ -776,6 +830,9 @@ export default function ChatPage() {
           };
           sidebarRef.current?.addChat(chatToAdd);
           mobileSidebarRef.current?.addChat(chatToAdd);
+
+          // Update local state immediately for smooth UX
+          setCurrentChatId(chat.id);
 
           // Generate and update title immediately
           if (!titleRefreshScheduledRef.current && input.trim().length > 0) {
@@ -819,7 +876,16 @@ export default function ChatPage() {
         images: undefined,
       },
     ]);
-    setIsLoading(false); // Hide "Thinking..." immediately, show streaming message card instead
+    // Mark that messages are being streamed for this chat (prevents reload)
+    if (chatIdToUse) {
+      messagesChatIdRef.current = chatIdToUse;
+    }
+    // Hide "Thinking..." indicator at bottom since we now have an empty message card
+    setIsLoading(false);
+
+    // Create AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       const response = await fetch("/api/chat", {
@@ -835,6 +901,7 @@ export default function ChatPage() {
           })),
           chatId: chatIdToUse,
         }),
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -869,11 +936,13 @@ export default function ChatPage() {
                     assistantMessage += parsed.content;
                     setMessages((prev) => {
                       const updated = [...prev];
-                      updated[assistantMessageIndex] = {
-                        role: "assistant",
-                        content: assistantMessage,
-                        images: messageImages.length > 0 ? messageImages : undefined,
-                      };
+                      if (assistantMessageIndex >= 0 && assistantMessageIndex < updated.length) {
+                        updated[assistantMessageIndex] = {
+                          role: "assistant",
+                          content: assistantMessage,
+                          images: messageImages.length > 0 ? messageImages : undefined,
+                        };
+                      }
                       return updated;
                     });
                   } else if (parsed.type === "function_result") {
@@ -891,11 +960,16 @@ export default function ChatPage() {
                           });
                           setMessages((prev) => {
                             const updated = [...prev];
-                            updated[assistantMessageIndex] = {
-                              role: "assistant",
-                              content: assistantMessage,
-                              images: [...messageImages],
-                            };
+                            if (
+                              assistantMessageIndex >= 0 &&
+                              assistantMessageIndex < updated.length
+                            ) {
+                              updated[assistantMessageIndex] = {
+                                role: "assistant",
+                                content: assistantMessage,
+                                images: [...messageImages],
+                              };
+                            }
                             return updated;
                           });
                         }
@@ -970,7 +1044,13 @@ export default function ChatPage() {
           }
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      // Don't show error if request was aborted
+      if (error instanceof Error && error.name === "AbortError") {
+        // Request was cancelled by user
+        return;
+      }
+
       console.error("Chat error:", error);
       setMessages((prev) => {
         const updated = [...prev];
@@ -988,8 +1068,23 @@ export default function ChatPage() {
         return updated;
       });
     } finally {
+      abortControllerRef.current = null;
       setIsLoading(false);
       inputRef.current?.focus();
+
+      // Update URL silently after stream completes (completely unnoticeable)
+      // Use a small delay to ensure it happens after all UI updates
+      if (chatIdToUse && chatIdToUse !== chatId) {
+        setTimeout(() => {
+          if (typeof window !== "undefined") {
+            window.history.replaceState(
+              { ...window.history.state, chatId: chatIdToUse },
+              "",
+              `/chat/${chatIdToUse}`
+            );
+          }
+        }, 500);
+      }
     }
   };
 
@@ -1058,293 +1153,296 @@ export default function ChatPage() {
             )}
 
             <AnimatePresence>
-              {messages.map((message, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex gap-3 items-center ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {message.role === "assistant" && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                  )}
-                  <Card
-                    className={`group relative max-w-[80%] sm:max-w-[70%] p-4 ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground hover:bg-primary"
-                        : "bg-muted"
-                    }`}
+              {messages
+                .filter((message) => message && message.role)
+                .map((message, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={`flex gap-3 items-center ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {message.edited && message.role === "user" && (
-                      <div className="absolute top-2 right-2 text-xs text-primary-foreground/50 italic">
-                        (edited)
+                    {message.role === "assistant" && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-primary" />
                       </div>
                     )}
-                    {message.role === "user" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-                        {editingMessageIndex === index ? (
-                          <div className="space-y-3">
-                            <Textarea
-                              ref={editInputRef}
-                              value={editingContent}
-                              onChange={(e) => setEditingContent(e.target.value)}
-                              className="min-h-[100px] bg-background/20 text-primary-foreground border-primary-foreground/30 resize-none"
-                              placeholder="Edit your message..."
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") {
-                                  handleCancelEdit();
-                                } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                                  e.preventDefault();
-                                  handleSaveEdit(index);
-                                }
-                              }}
-                            />
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSaveEdit(index)}
-                                disabled={!editingContent.trim() || isLoading}
-                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
-                              >
-                                <Save className="h-3.5 w-3.5 mr-1.5" />
-                                Save & Resend
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleCancelEdit}
-                                disabled={isLoading}
-                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
-                              >
-                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {message.files && message.files.length > 0 && (
-                              <div className="space-y-2 mb-3">
-                                {message.files.map((file, idx) => (
-                                  <div key={idx} className="space-y-2">
-                                    <div className="flex items-center gap-2 p-2 bg-background/20 rounded border text-sm">
-                                      <Paperclip className="h-4 w-4 shrink-0" />
-                                      <span className="truncate flex-1">{file.name}</span>
-                                      <span className="text-xs opacity-80">
-                                        {(file.size / 1024).toFixed(1)} KB
-                                      </span>
-                                    </div>
-                                    {file.type.startsWith("image/") && (
-                                      <div className="rounded-lg overflow-hidden">
-                                        <Image
-                                          src={file.data}
-                                          alt={file.name}
-                                          width={192}
-                                          height={192}
-                                          className="max-w-xs max-h-48 rounded"
-                                          unoptimized
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                    <Card
+                      className={`group relative max-w-[80%] sm:max-w-[70%] p-4 ${
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground hover:bg-primary"
+                          : "bg-muted"
+                      }`}
+                    >
+                      {message.edited && message.role === "user" && (
+                        <div className="absolute top-2 right-2 text-xs text-primary-foreground/50 italic">
+                          (edited)
+                        </div>
+                      )}
+                      {message.role === "user" ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                          {editingMessageIndex === index ? (
+                            <div className="space-y-3">
+                              <Textarea
+                                ref={editInputRef}
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="min-h-[100px] bg-background/20 text-primary-foreground border-primary-foreground/30 resize-none"
+                                placeholder="Edit your message..."
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") {
+                                    handleCancelEdit();
+                                  } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                    e.preventDefault();
+                                    handleSaveEdit(index);
+                                  }
+                                }}
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSaveEdit(index)}
+                                  disabled={!editingContent.trim() || isLoading}
+                                  className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                >
+                                  <Save className="h-3.5 w-3.5 mr-1.5" />
+                                  Save & Resend
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEdit}
+                                  disabled={isLoading}
+                                  className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                  Cancel
+                                </Button>
                               </div>
-                            )}
-                            {message.content && (
+                            </div>
+                          ) : (
+                            <>
+                              {message.files && message.files.length > 0 && (
+                                <div className="space-y-2 mb-3">
+                                  {message.files.map((file, idx) => (
+                                    <div key={idx} className="space-y-2">
+                                      <div className="flex items-center gap-2 p-2 bg-background/20 rounded border text-sm">
+                                        <Paperclip className="h-4 w-4 shrink-0" />
+                                        <span className="truncate flex-1">{file.name}</span>
+                                        <span className="text-xs opacity-80">
+                                          {(file.size / 1024).toFixed(1)} KB
+                                        </span>
+                                      </div>
+                                      {file.type.startsWith("image/") && (
+                                        <div className="rounded-lg overflow-hidden">
+                                          <Image
+                                            src={file.data}
+                                            alt={file.name}
+                                            width={192}
+                                            height={192}
+                                            className="max-w-xs max-h-48 rounded"
+                                            unoptimized
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {message.content && (
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={markdownComponents}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
+                              )}
+                              <div className="mt-3 pt-2 border-t border-primary-foreground/20 flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                  onClick={() => handleStartEdit(index, message.content)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                  onClick={() => handleCopyAsMarkdown(message.content, index)}
+                                >
+                                  {copiedMessageId === `markdown-${index}` ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
+                                      Copy MD
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
+                                  onClick={() => handleCopyAsPlaintext(message.content, index)}
+                                >
+                                  {copiedMessageId === `plaintext-${index}` ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
+                                      Copy TXT
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                          {message.images && message.images.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              {message.images.map((img, idx) => (
+                                <div key={idx} className="rounded-lg overflow-hidden">
+                                  <Image
+                                    src={img.url}
+                                    alt={img.prompt || "Generated image"}
+                                    width={512}
+                                    height={512}
+                                    className="w-full h-auto max-w-md"
+                                    unoptimized
+                                  />
+                                  {img.prompt && (
+                                    <p className="text-xs text-muted-foreground mt-1 italic">
+                                      {img.prompt}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {message.files && message.files.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              {message.files.map((file, idx) => (
+                                <div key={idx} className="space-y-2">
+                                  <div className="flex items-center gap-2 p-2 bg-background/50 rounded border text-sm">
+                                    <Paperclip className="h-4 w-4 shrink-0" />
+                                    <span className="truncate flex-1">{file.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {(file.size / 1024).toFixed(1)} KB
+                                    </span>
+                                  </div>
+                                  {file.type.startsWith("image/") && (
+                                    <div className="rounded-lg overflow-hidden">
+                                      <Image
+                                        src={file.data}
+                                        alt={file.name}
+                                        width={192}
+                                        height={192}
+                                        className="max-w-xs max-h-48 rounded"
+                                        unoptimized
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {message.content ? (
+                            <>
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
-                                components={markdownComponents}
+                                components={markdownComponentsDark}
                               >
                                 {message.content}
                               </ReactMarkdown>
-                            )}
-                            <div className="mt-3 pt-2 border-t border-primary-foreground/20 flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
-                                onClick={() => handleStartEdit(index, message.content)}
-                              >
-                                <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
-                                onClick={() => handleCopyAsMarkdown(message.content, index)}
-                              >
-                                {copiedMessageId === `markdown-${index}` ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
-                                    Copy MD
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-primary-foreground/70 hover:text-primary-foreground hover:bg-transparent border border-primary-foreground/20"
-                                onClick={() => handleCopyAsPlaintext(message.content, index)}
-                              >
-                                {copiedMessageId === `plaintext-${index}` ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
-                                    Copy TXT
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-                        {message.images && message.images.length > 0 && (
-                          <div className="space-y-2 mb-3">
-                            {message.images.map((img, idx) => (
-                              <div key={idx} className="rounded-lg overflow-hidden">
-                                <Image
-                                  src={img.url}
-                                  alt={img.prompt || "Generated image"}
-                                  width={512}
-                                  height={512}
-                                  className="w-full h-auto max-w-md"
-                                  unoptimized
-                                />
-                                {img.prompt && (
-                                  <p className="text-xs text-muted-foreground mt-1 italic">
-                                    {img.prompt}
-                                  </p>
-                                )}
+                              <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                                  onClick={() => handleCopyAsMarkdown(message.content, index)}
+                                >
+                                  {copiedMessageId === `markdown-${index}` ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
+                                      Copy MD
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
+                                  onClick={() => handleCopyAsPlaintext(message.content, index)}
+                                >
+                                  {copiedMessageId === `plaintext-${index}` ? (
+                                    <>
+                                      <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
+                                      Copied
+                                    </>
+                                  ) : (
+                                    <>
+                                      <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
+                                      Copy TXT
+                                    </>
+                                  )}
+                                </Button>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                        {message.files && message.files.length > 0 && (
-                          <div className="space-y-2 mb-3">
-                            {message.files.map((file, idx) => (
-                              <div key={idx} className="space-y-2">
-                                <div className="flex items-center gap-2 p-2 bg-background/50 rounded border text-sm">
-                                  <Paperclip className="h-4 w-4 shrink-0" />
-                                  <span className="truncate flex-1">{file.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {(file.size / 1024).toFixed(1)} KB
-                                  </span>
-                                </div>
-                                {file.type.startsWith("image/") && (
-                                  <div className="rounded-lg overflow-hidden">
-                                    <Image
-                                      src={file.data}
-                                      alt={file.name}
-                                      width={192}
-                                      height={192}
-                                      className="max-w-xs max-h-48 rounded"
-                                      unoptimized
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {message.content ? (
-                          <>
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={markdownComponentsDark}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
-                            <div className="mt-3 pt-2 border-t border-border/40 flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
-                                onClick={() => handleCopyAsMarkdown(message.content, index)}
-                              >
-                                {copiedMessageId === `markdown-${index}` ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <FaMarkdown className="h-3.5 w-3.5 mr-1.5" />
-                                    Copy MD
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent border border-border/80"
-                                onClick={() => handleCopyAsPlaintext(message.content, index)}
-                              >
-                                {copiedMessageId === `plaintext-${index}` ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600 dark:text-green-400" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <GrDocumentTxt className="h-3.5 w-3.5 mr-1.5" />
-                                    Copy TXT
-                                  </>
-                                )}
-                              </Button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground py-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Thinking...</span>
                             </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2 text-muted-foreground py-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Thinking...</span>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                    {message.role === "user" && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="h-4 w-4 text-primary" />
                       </div>
                     )}
-                  </Card>
-                  {message.role === "user" && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-4 w-4 text-primary" />
-                    </div>
-                  )}
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))}
             </AnimatePresence>
 
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 justify-start items-center"
-              >
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary" />
-                </div>
-                <Card className="max-w-[80%] sm:max-w-[70%] bg-muted p-4">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Thinking...</span>
+            {isLoading &&
+              !messages.some((msg) => msg.role === "assistant" && !msg.content && !msg.images) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3 justify-start items-center"
+                >
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-primary" />
                   </div>
-                </Card>
-              </motion.div>
-            )}
+                  <Card className="max-w-[80%] sm:max-w-[70%] bg-muted p-4">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Thinking...</span>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
 
             <div ref={messagesEndRef} />
           </div>
@@ -1419,20 +1517,26 @@ export default function ChatPage() {
                     }
                   }}
                 />
-                <Button
-                  type="submit"
-                  disabled={
-                    isLoading || loadingMessages || (!input.trim() && attachedFiles.length === 0)
-                  }
-                  size="icon"
-                  className="shrink-0 h-[44px] w-[44px]"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+                {isLoading ? (
+                  <Button
+                    type="button"
+                    onClick={handleStop}
+                    variant="destructive"
+                    size="icon"
+                    className="shrink-0 h-[44px] w-[44px]"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={loadingMessages || (!input.trim() && attachedFiles.length === 0)}
+                    size="icon"
+                    className="shrink-0 h-[44px] w-[44px]"
+                  >
                     <Send className="h-4 w-4" />
-                  )}
-                </Button>
+                  </Button>
+                )}
               </div>
             </form>
           </div>
